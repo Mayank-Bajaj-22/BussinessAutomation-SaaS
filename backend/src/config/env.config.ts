@@ -7,6 +7,10 @@ export const {
     NODE_ENV,
     PORT,
     DATABASE_URL,
+    JWT_ACCESS_TOKEN_SECRET,
+    JWT_REFRESH_TOKEN_SECRET,
+    JWT_ACCESS_TOKEN_EXPIRY,
+    JWT_REFRESH_TOKEN_EXPIRY
 } = process.env;
 
 if (!DATABASE_URL) {
@@ -14,5 +18,21 @@ if (!DATABASE_URL) {
 }
 
 if (!PORT) {
-    throw new Error("PORT is missing.")
+    throw new Error("PORT is missing.");
+}
+
+if (!JWT_ACCESS_TOKEN_SECRET) {
+    throw new Error("JWT_ACCESS_TOKEN_SECRET is missing.");
+}
+
+if (!JWT_REFRESH_TOKEN_SECRET) {
+    throw new Error("JWT_REFRESH_TOKEN_SECRET is missing.");
+}
+
+if (!JWT_ACCESS_TOKEN_EXPIRY) {
+    throw new Error("JWT_ACCESS_TOKEN_EXPIRY is missing.");
+}
+
+if (!JWT_REFRESH_TOKEN_EXPIRY) {
+    throw new Error("JWT_REFRESH_TOKEN_EXPIRY is missing.");
 }
