@@ -1,6 +1,7 @@
 import { Membership, MembershipRole, Prisma, PrismaClient } from "@prisma/client";
 import { IMembershipRepository } from "./membership.repository.interface.js";
 import { prisma } from "../../lib/prisma.js";
+import { MembershipWithOrganization } from "../../common/types/index.js";
 
 export class MembershipRepository implements IMembershipRepository {
     constructor(
@@ -91,6 +92,22 @@ export class MembershipRepository implements IMembershipRepository {
             },
             data: {
                 status: "ACTIVE",
+            },
+        });
+    }
+
+    async findActiveMembershipWithOrganization(userId: string, organizationId?: string): Promise<MembershipWithOrganization | null> {
+        return this.db.membership.findFirst({
+            where: {
+                userId,
+                organizationId,
+                status: "ACTIVE",
+            },
+            include: {
+                organization: true,
+            },
+            orderBy: {
+                createdAt: "asc",
             },
         });
     }

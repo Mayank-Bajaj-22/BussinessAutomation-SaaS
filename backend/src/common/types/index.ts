@@ -1,4 +1,5 @@
-import { DataTypeMap } from "node:ffi";
+import { MembershipRole, Prisma } from "@prisma/client";
+import { JwtPayload } from "jsonwebtoken";
 
 export type ApiResponse<T> = {
     success: boolean;
@@ -6,10 +7,17 @@ export type ApiResponse<T> = {
     data?: T;
 };
 
-export interface IJwtPayload {
+export interface IJwtPayload extends JwtPayload {
     userId: string;
     organizationId: string;
-    membershipRole: string;
+    membershipRole: MembershipRole;
     email: string;
     isEmailVerified: boolean;
 }
+
+export type MembershipWithOrganization = 
+    Prisma.MembershipGetPayload<{
+        include: {
+            organization: true,
+        }
+    }>

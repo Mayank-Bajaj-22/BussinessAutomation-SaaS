@@ -34,4 +34,8 @@ export interface IRefreshTokenRepository {
     ) : Promise<RefreshToken>;
 
     deleteExpired() : Promise<Prisma.BatchPayload>;
+
+    updateLastUsed(
+        refreshTokenId: string,
+    ) : Promise<RefreshToken>;
 }

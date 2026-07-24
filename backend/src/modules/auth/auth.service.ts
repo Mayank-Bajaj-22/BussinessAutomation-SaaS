@@ -1,12 +1,11 @@
 import { AppError } from "../../common/errors/AppError.js";
 import { generateOrganizationSlug } from "../../common/utils/generateOrganizationSlug.js";
-import { hashPassword, hashRefreshToken } from "../../lib/bcrypt.js";
+import { comparePassword, hashPassword, hashRefreshToken } from "../../lib/bcrypt.js";
 import { prisma } from "../../lib/prisma.js";
 import { IMembershipRepository } from "../membership/membership.repository.interface.js";
 import { IOrganizationRepository } from "../organization/organization.repository.interface.js";
 import { IUserRepository } from "../user/user.repository.interface.js";
-import { IAuthRepository } from "./auth.interface.js";
-import { RegisterUserDTO } from "./auth.schema.js";
+import { LoginUserDTO, RefreshTokenDTO, RegisterUserDTO } from "./auth.schema.js";
 import crypto from "crypto";
 import { IRefreshTokenRepository } from "./repositories/refresh-token.repository.interface.js";
 import { IPasswordResetTokenRepository } from "./repositories/password-reset-token.repository.interface.js";
@@ -16,8 +15,10 @@ import { OrganizationRepository } from "../organization/organization.repository.
 import { MembershipRepository } from "../membership/membership.repository.js";
 import { VerificationTokenRepository } from "./repositories/verification-token.repository.js";
 import { MembershipRole } from "@prisma/client";
-import { generateAccessToken, generateRefreshToken } from "../../lib/jwt.js";
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../lib/jwt.js";
 import { toJwtPayload } from "../../common/mappers/jwt.mapper.js";
+import { IJwtPayload } from "../../common/types/index.js";
+import { RefreshTokenRepository } from "./repositories/refresh-token.repository.js";
 
 export class AuthService {
     constructor(
@@ -148,5 +149,208 @@ export class AuthService {
             accessToken,
             refreshToken,
         }
+    }
+
+    async loginUser(data: LoginUserDTO) {
+        const { email, password } = data;
+
+        const user = await this.userRepo.findByEmail(email);
+
+        if (!user) {
+            throw new AppError("Invalid email or password.", 401);
+        }
+
+        const passwordMatched  = await comparePassword(password, user.password);
+
+        if (!passwordMatched ) {
+            throw new AppError("Incorrect Password.", 401);
+        }
+
+        if (user.deletedAt) {
+            throw new AppError("User account has been deleted.", 403);
+        }
+
+        if (user.status !== "ACTIVE") {
+            throw new AppError("User account is inactive.", 403);
+        }
+
+        // if (!user.isEmailVerified) {
+        //     throw new AppError(
+        //         "Please verify your email first.",
+        //         403,
+        //     );
+        // }
+
+        const membership = await this.membershipRepo.findActiveMembershipWithOrganization(user.id);
+
+        if (!membership) {
+            throw new AppError(
+                "No organization membership found.",
+                403,
+            );
+        }
+
+        if (membership.organization.status !== "ACTIVE") {
+            throw new AppError(
+                "Organization is inactive.",
+                403,
+            );
+        }
+
+        const jwtPayload = toJwtPayload(
+            user,
+            membership.organization,
+            membership,
+        );
+
+        const accessToken = generateAccessToken(jwtPayload);
+        const refreshToken = generateRefreshToken(jwtPayload);
+
+        const hashedRefreshToken = hashRefreshToken(refreshToken);
+
+        const refreshExpiresAt = new Date(
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
+        );
+
+        await this.refreshTokenRepo.create({
+            tokenHash: hashedRefreshToken,
+            userId: user.id,
+            expiresAt: refreshExpiresAt,
+            deviceName: "Unknown Device",
+            ipAddress: "",
+            userAgent: "",
+            sessionId: crypto.randomUUID(),
+            lastUsedAt: new Date(),
+        });
+
+        await this.userRepo.updateLastLogin(user.id);
+
+        return {
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                isEmailVerified: user.isEmailVerified,
+            },
+
+            organization: {
+                id: membership.organization.id,
+                name: membership.organization.name,
+                slug: membership.organization.slug,
+            },
+
+            accessToken,
+            refreshToken,
+        };
+    }
+
+    async refreshToken(data: RefreshTokenDTO, metadata: {
+        deviceName: string;
+        ipAddress: string;
+        userAgent: string;
+    }) {
+        const { refreshToken } = data;
+
+        const hashedToken = hashRefreshToken(refreshToken);
+
+        const storedToken = await this.refreshTokenRepo.findByHash(hashedToken);
+
+        if (!storedToken) {
+            throw new AppError("Invalid refresh token.", 401);
+        }
+
+        if (storedToken.revokedAt) {
+            await this.refreshTokenRepo.revokeAll(storedToken.userId);
+
+            throw new AppError("Refresh token has been revoked.", 401);
+        }
+
+        if (storedToken.expiresAt < new Date()) {
+            await this.refreshTokenRepo.revoke(storedToken.id);
+
+            throw new AppError("Refresh token has expired.", 401);
+        }
+
+        const payload = verifyRefreshToken(refreshToken);
+
+        const user = await this.userRepo.findById(payload.userId);
+
+        if (!user) {
+            throw new AppError("User not found.", 404);
+        }
+
+        if (user.deletedAt) {
+            throw new AppError("User account deleted.", 403);
+        }
+
+        if (user.status !== "ACTIVE") {
+            throw new AppError("User account deleted.", 403);
+        }
+
+        const membership = await this.membershipRepo.findActiveMembershipWithOrganization(user.id);
+
+        if (!membership) {
+            throw new AppError("No active organization found.", 403);
+        }
+
+        if (membership.organization.status !== "ACTIVE") {
+            throw new AppError("Organization inactive.", 403);
+        }
+
+        const jwtPayload = toJwtPayload(
+            user,
+            membership.organization,
+            membership,
+        );
+
+        const newAccessToken = generateAccessToken(jwtPayload);
+        const newRefreshToken = generateRefreshToken(jwtPayload);
+
+        const hashedNewRefreshToken = hashRefreshToken(newRefreshToken);
+
+        await prisma.$transaction(async (tx) => {
+            const refreshRepo = 
+                new RefreshTokenRepository(tx);
+
+            // revoke old token
+            await refreshRepo.revoke(
+                storedToken.id,
+            );
+
+            // save new token
+            await refreshRepo.create({
+                tokenHash: hashedNewRefreshToken,
+                userId: user.id,
+                expiresAt: new Date(
+                    Date.now() + 30 * 24 * 60 * 60 * 1000,
+                ),
+                deviceName: metadata.deviceName,
+                ipAddress: metadata.ipAddress,
+                userAgent: metadata.userAgent,
+                sessionId: storedToken.sessionId,
+                lastUsedAt: new Date(),
+                isCurrent: true,
+            });
+        });
+
+        await this.userRepo.updateLastLogin(
+            user.id,
+        );
+
+        return {
+            accessToken: newAccessToken,
+            refreshToken: newRefreshToken,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                isEmailVerified: user.isEmailVerified,
+            },
+            organization: {
+                id: membership.organization.id,
+                name: membership.organization.name,
+                slug: membership.organization.slug,
+            },
+        };
     }
 }

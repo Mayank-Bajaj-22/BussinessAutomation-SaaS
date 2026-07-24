@@ -16,5 +16,9 @@ app.get("/health-check", (req, res) => {
     });
 });
 
+import authRouter from "./modules/auth/auth.routes.js";
+
+app.use("/api/v1/auth", authRouter);
+
 app.use(globalErrorHandler);
 app.use(requestContextMiddleware);

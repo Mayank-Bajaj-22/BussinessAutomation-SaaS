@@ -1,9 +1,17 @@
+import { Membership, Organization } from "@prisma/client";
+
 declare global {
     namespace Express {
         interface Request {
-            requestId: string;
-            userId?: string;
-            organizationId?: string;
+            user?: {
+                requestId?: string;
+                userId?: string;
+                organizationId?: string;
+                role: string;
+                email: string;
+            },
+            organization?: Organization;
+            membership?: Membership;
         }
     }
 }

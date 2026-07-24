@@ -12,7 +12,51 @@ export const registerUserController = CatchAsync(
 
         sendResponse(res, 201, {
             success: true,
-            message: "Account created successfully."
+            message: "Account created successfully.",
+            data: result,
         })
+    }
+)
+
+export const loginUserController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const result = await authService.loginUser(req.body);
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "User logged in successfully.",
+            data: result
+        });
+    }
+)
+
+export const refreshTokenController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const result = await authService.refreshToken(
+            req.body,
+            {
+                deviceName: 
+                    req.headers["sec-ch-ua-platform"]?.toString() ??
+                    "Unknown Device",
+                ipAddress:
+                    req.ip ??
+                    req.socket.remoteAddress ??
+                    "Unknown",
+                userAgent:
+                    req.headers["user-agent"] ??
+                    "Unknown",
+            },
+        );
+
+        setCookies(res, result.accessToken, result.refreshToken);
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Refresh token rotated successfully.",
+            data: {
+                user: result.user,
+                organization: result.organization,
+            },
+        });
     }
 )

@@ -96,4 +96,17 @@ export class RefreshTokenRepository {
             },
         });
     }
+
+    async updateLastUsed(
+        refreshTokenId: string,
+    ) : Promise<RefreshToken> {
+        return this.db.refreshToken.update({
+            where: {
+                id: refreshTokenId,
+            },
+            data: {
+                lastUsedAt: new Date(),
+            }
+        })
+    }
 }

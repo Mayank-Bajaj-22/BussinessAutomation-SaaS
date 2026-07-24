@@ -23,6 +23,6 @@ export const verifyAccessToken = (token: string) => {
     return jwt.verify(token, accessTokenSecret);
 }
 
-export const verifyRefreshToken = (token: string) => {
-    return jwt.verify(token, refreshTokenSecret);
+export const verifyRefreshToken = (token: string) : IJwtPayload => {
+    return jwt.verify(token, refreshTokenSecret) as IJwtPayload;
 }
