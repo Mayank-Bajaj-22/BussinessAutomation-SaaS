@@ -5,7 +5,7 @@ import { prisma } from "../../lib/prisma.js";
 import { IMembershipRepository } from "../membership/membership.repository.interface.js";
 import { IOrganizationRepository } from "../organization/organization.repository.interface.js";
 import { IUserRepository } from "../user/user.repository.interface.js";
-import { LoginUserDTO, RefreshTokenDTO, RegisterUserDTO } from "./auth.schema.js";
+import { LoginUserDTO, LogoutUserDTO, RefreshTokenDTO, RegisterUserDTO, VerifyEmailDTO } from "./auth.schema.js";
 import crypto from "crypto";
 import { IRefreshTokenRepository } from "./repositories/refresh-token.repository.interface.js";
 import { IPasswordResetTokenRepository } from "./repositories/password-reset-token.repository.interface.js";
@@ -26,11 +26,18 @@ export class AuthService {
         private organizationRepo: IOrganizationRepository,
         private membershipRepo: IMembershipRepository,
         private refreshTokenRepo: IRefreshTokenRepository,
-        private passwordResetRepo: IPasswordResetTokenRepository,
         private verificationTokenRepo: IVerificationTokenRepository,
+        private passwordResetRepo: IPasswordResetTokenRepository,
     ) {}
 
-    async registerUser(data: RegisterUserDTO) {
+    async registerUser(
+        data: RegisterUserDTO,
+        metadata: {
+            deviceName: string,
+            ipAddress: string,
+            userAgent: string,
+        },
+    ) {
         const { name, email, password, organizationName, timezone } = data;
 
         const existingUser = await this.userRepo.findByEmail(email);
@@ -117,9 +124,9 @@ export class AuthService {
             tokenHash: hashedRefreshToken,
             userId: user.id,
             expiresAt: refreshExpiresAt,
-            deviceName: "Unknown Device",
-            ipAddress: "",
-            userAgent: "",
+            deviceName: metadata.deviceName,
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
             sessionId: crypto.randomUUID(),
             lastUsedAt: new Date(),
         })
@@ -148,10 +155,18 @@ export class AuthService {
 
             accessToken,
             refreshToken,
+            verificationToken,
         }
     }
 
-    async loginUser(data: LoginUserDTO) {
+    async loginUser(
+        data: LoginUserDTO,
+        metadata: {
+            deviceName: string,
+            ipAddress: string,
+            userAgent: string,
+        }
+    ) {
         const { email, password } = data;
 
         const user = await this.userRepo.findByEmail(email);
@@ -216,9 +231,9 @@ export class AuthService {
             tokenHash: hashedRefreshToken,
             userId: user.id,
             expiresAt: refreshExpiresAt,
-            deviceName: "Unknown Device",
-            ipAddress: "",
-            userAgent: "",
+            deviceName: metadata.deviceName,
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
             sessionId: crypto.randomUUID(),
             lastUsedAt: new Date(),
         });
@@ -251,6 +266,8 @@ export class AuthService {
     }) {
         const { refreshToken } = data;
 
+        const payload = verifyRefreshToken(refreshToken);
+
         const hashedToken = hashRefreshToken(refreshToken);
 
         const storedToken = await this.refreshTokenRepo.findByHash(hashedToken);
@@ -270,8 +287,6 @@ export class AuthService {
 
             throw new AppError("Refresh token has expired.", 401);
         }
-
-        const payload = verifyRefreshToken(refreshToken);
 
         const user = await this.userRepo.findById(payload.userId);
 
@@ -352,5 +367,114 @@ export class AuthService {
                 slug: membership.organization.slug,
             },
         };
+    }
+
+    async verifyEmail(data: VerifyEmailDTO) {
+        const { token } = data;
+
+        console.log(token);
+
+        const tokenHash = hashRefreshToken(token);
+
+        console.log("Hashed token", tokenHash)
+
+        const verificationToken = 
+            await this.verificationTokenRepo.findByHash(
+                tokenHash,
+            );
+
+        if (!verificationToken) {
+            throw new AppError(
+                "Invalid verification token.",
+                400,
+            );
+        }
+
+        if (verificationToken.usedAt) {
+            throw new AppError(
+                "Verification token already used.",
+                400,
+            );
+        }
+
+        if (verificationToken.expiresAt < new Date()) {
+            throw new AppError(
+                "Verification token expired.",
+                400,
+            );
+        }
+
+        const user = 
+            await this.userRepo.findById(
+                verificationToken.userId,
+            );
+
+        if (!user) {
+            throw new AppError(
+                "User not found",
+                404,
+            );
+        }
+
+        await prisma.$transaction(async (tx) => {
+            const userRepository =
+                new UserRepository(tx);
+
+            const verificationRepository =
+                new VerificationTokenRepository(tx);
+
+            await userRepository.verifyEmail(user.id);
+
+            await verificationRepository.markAsUsed(
+                verificationToken.id,
+            );
+
+            await verificationRepository.delete(
+                verificationToken.id,
+            );
+        });
+
+        return;
+    }
+
+    async logoutUser(data: LogoutUserDTO) {
+        const { refreshToken } = data;
+
+        const hashedToken = hashRefreshToken(refreshToken);
+
+        const storedToken = await this.refreshTokenRepo.findByHash(
+            hashedToken,
+        );
+
+        if (!storedToken) {
+            return;
+        }
+
+        if (!storedToken.revokedAt) {
+            return;
+        }
+
+        await this.refreshTokenRepo.revoke(
+            storedToken.id,
+        );
+
+        return true;
+    }
+
+    async logoutAll(userId: string) {
+        const user = await this.userRepo.findById(userId);
+
+        if (!user) {
+            throw new AppError(
+                "User not found.",
+                404,
+            );
+        }
+
+        await this.refreshTokenRepo.revokeAll(
+            user.id,
+        );
+
+        return true;
     }
 }

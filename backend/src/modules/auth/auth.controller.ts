@@ -1,12 +1,29 @@
 import { Request, Response } from "express";
 import { CatchAsync } from "../../common/utils/CatchAsync.js";
 import { authService } from "./auth.container.js";
-import { setCookies } from "../../lib/bcrypt.js";
+import { destroyCookies, setCookies } from "../../lib/bcrypt.js";
 import { sendResponse } from "../../common/utils/sendResponse.js";
+import { VerifyEmailDTO } from "./auth.schema.js";
 
 export const registerUserController = CatchAsync(
     async (req: Request, res: Response) => {
-        const result = await authService.registerUser(req.body);
+        const result = await authService.registerUser(
+            req.body,
+            {
+                deviceName:
+                    req.headers["sec-ch-ua-platform"]?.toString() ??
+                    "Unknown Device",
+
+                ipAddress:
+                    req.ip ??
+                    req.socket.remoteAddress ??
+                    "Unknown",
+
+                userAgent:
+                    req.headers["user-agent"] ??
+                    "Unknown",
+            },
+        );
 
         setCookies(res, result.accessToken, result.refreshToken);
 
@@ -20,7 +37,23 @@ export const registerUserController = CatchAsync(
 
 export const loginUserController = CatchAsync(
     async (req: Request, res: Response) => {
-        const result = await authService.loginUser(req.body);
+        const result = await authService.loginUser(
+            req.body,
+            {
+                deviceName:
+                    req.headers["sec-ch-ua-platform"]?.toString() ??
+                    "Unknown Device",
+
+                ipAddress:
+                    req.ip ??
+                    req.socket.remoteAddress ??
+                    "Unknown",
+
+                userAgent:
+                    req.headers["user-agent"] ??
+                    "Unknown",
+            },
+        );
 
         sendResponse(res, 200, {
             success: true,
@@ -59,4 +92,48 @@ export const refreshTokenController = CatchAsync(
             },
         });
     }
-)
+);
+
+export const verifyEmailController = CatchAsync(
+    async (req: Request, res: Response) => {
+        await authService.verifyEmail(req.query as VerifyEmailDTO);
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Email verified successfully."
+        });
+    }
+);
+
+export const logoutUserController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const isLoggedOut = await authService.logoutUser(req.body);
+
+        if (isLoggedOut) {
+            destroyCookies(res);
+        }
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Logged out successfully.",
+        });
+    }
+);
+
+export const logoutAllController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const userId = req.user!.userId;
+
+        const isLoggedOut = await authService.logoutAll(userId!);
+
+        if (isLoggedOut) {
+            destroyCookies(res);
+        }
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Logout out from all devices successfully."
+        });
+    }
+);
+

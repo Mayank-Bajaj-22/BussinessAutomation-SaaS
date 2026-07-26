@@ -58,6 +58,12 @@ export const refreshTokenSchema = z
     })
     .strict();
 
+export const logoutUserSchema = z
+    .object({
+        refreshToken: z.string(),
+    })
+    .strict();
+
 export type RegisterUserDTO = z.infer<typeof registerUserSchema>;
 export type LoginUserDTO = z.infer<typeof loginUserSchema>;
 export type VerifyEmailDTO = z.infer<typeof verifyEmailSchema>;
@@ -65,3 +71,4 @@ export type ForgotPasswordDTO = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordDTO = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordDTO = z.infer<typeof changePasswordSchema>;
 export type RefreshTokenDTO = z.infer<typeof refreshTokenSchema>;
+export type LogoutUserDTO = z.infer<typeof logoutUserSchema>;

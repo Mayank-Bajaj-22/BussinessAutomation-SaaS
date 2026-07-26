@@ -15,7 +15,7 @@ export const comparePassword = async (
 }
 
 export const hashRefreshToken = (refreshToken: string) => {
-    return crypto.createHash("sha-256").update(refreshToken).digest("hex");
+    return crypto.createHash("sha256").update(refreshToken).digest("hex");
 }
 
 export const setCookies = (

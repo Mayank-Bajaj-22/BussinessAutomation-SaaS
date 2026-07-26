@@ -18,14 +18,14 @@ export class VerificationTokenRepository {
         });
     }
 
-    async findByHash(
-        tokenHash: string,
-    ) : Promise<VerificationToken | null> {
-        return this.db.verificationToken.findUnique({
+    async findByHash(tokenHash: string): Promise<VerificationToken | null> {
+        const result = await this.db.verificationToken.findUnique({
             where: {
                 tokenHash,
             },
-        });
+        });;
+
+        return result;
     }
 
     async markAsUsed(

@@ -12,8 +12,7 @@ export const validate =
         next: NextFunction,
     ) => {
         try {
-            const parsed = schema.parse(req[source]);
-            req[source] = parsed;
+            schema.parse(req[source]);
             next();
         } catch (error) {
             if (error instanceof ZodError) {
