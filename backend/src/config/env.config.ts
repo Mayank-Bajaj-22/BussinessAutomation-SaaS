@@ -15,6 +15,7 @@ export const {
     REDIS_HOST,
     REDIS_PORT,
     MAIL_FROM,
+    APP_URL,
 } = process.env;
 
 if (!DATABASE_URL) {
@@ -55,4 +56,7 @@ if (!REDIS_PORT) {
 
 if (!MAIL_FROM) {
     throw new Error("MAIL_FROM is missing.");
+}
+if (!APP_URL) {
+    throw new Error("APP_URL is missing.");
 }

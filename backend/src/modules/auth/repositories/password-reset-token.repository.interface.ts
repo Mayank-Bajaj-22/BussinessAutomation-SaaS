@@ -20,4 +20,8 @@ export interface IPasswordResetTokenRepository {
     ): Promise<PasswordResetToken>;
 
     deleteExpired(): Promise<Prisma.BatchPayload>;
-} 
+
+    deleteByUserId(
+        userId: string,
+    ) : Promise<Prisma.BatchPayload>;
+}  

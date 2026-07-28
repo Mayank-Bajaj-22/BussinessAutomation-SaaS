@@ -1,6 +1,8 @@
 import { sendMail } from "../../lib/mail.js";
 import { forgotPasswordTemplate } from "./templates/forgot-password.template.js";
 import { loginAlertTemplate } from "./templates/login-alert.template.js";
+import { passwordChangedTemplate } from "./templates/password-changed.template.js";
+import { passwordResetSuccessTemplate } from "./templates/password-reset-success.template.js";
 import { verificationTemplate } from "./templates/verification.template.js";
 import { welcomeTemplate } from "./templates/welcome.template.js";
 
@@ -63,6 +65,32 @@ class EmailService {
                 ipAddress: params.ipAddress,
                 userAgent: params.userAgent,
                 location: params.location,
+            }),
+        });
+    }
+
+    async sendPasswordResetSuccessEmail(params: {
+        to: string;
+        name: string;
+    }) {
+        await sendMail({
+            to: params.to,
+            subject: "Password Reset Successful",
+            html: passwordResetSuccessTemplate({
+                name: params.name,
+            }),
+        });
+    }
+
+    async sendPasswordChangedEmail(params: {
+        to: string;
+        name: string;
+    }) {
+        await sendMail({
+            to: params.to,
+            subject: "Password Changed",
+            html: passwordChangedTemplate({
+                name: params.name,
             }),
         });
     }

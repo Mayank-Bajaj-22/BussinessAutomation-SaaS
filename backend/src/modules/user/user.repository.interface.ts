@@ -29,4 +29,9 @@ export interface IUserRepository {
     softDelete(
         userId: string,
     ) : Promise<User>;
+
+    updatePassword(
+        userId: string,
+        password: string,
+    ) : Promise<User>;
 }

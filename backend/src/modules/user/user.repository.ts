@@ -88,4 +88,18 @@ export class UserRepository implements IUserRepository {
             },
         });
     }
+
+    async updatePassword(
+        userId: string, 
+        password: string,
+    ): Promise<User> {
+        return this.db.user.update({
+            where: {
+                id: userId,
+            },
+            data:{
+                password,
+            },
+        });
+    }
 }

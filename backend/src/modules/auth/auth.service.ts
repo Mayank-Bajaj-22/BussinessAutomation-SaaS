@@ -1,11 +1,11 @@
 import { AppError } from "../../common/errors/AppError.js";
 import { generateOrganizationSlug } from "../../common/utils/generateOrganizationSlug.js";
-import { comparePassword, hashPassword, hashRefreshToken } from "../../lib/bcrypt.js";
+import { comparePassword, hashPassword, hashRefreshToken, hashToken } from "../../lib/bcrypt.js";
 import { prisma } from "../../lib/prisma.js";
 import { IMembershipRepository } from "../membership/membership.repository.interface.js";
 import { IOrganizationRepository } from "../organization/organization.repository.interface.js";
 import { IUserRepository } from "../user/user.repository.interface.js";
-import { LoginUserDTO, LogoutUserDTO, RefreshTokenDTO, RegisterUserDTO, VerifyEmailDTO } from "./auth.schema.js";
+import { ChangePasswordDTO, ForgotPasswordDTO, LoginUserDTO, LogoutUserDTO, RefreshTokenDTO, RegisterUserDTO, ResetPasswordDTO, VerifyEmailDTO } from "./auth.schema.js";
 import crypto from "crypto";
 import { IRefreshTokenRepository } from "./repositories/refresh-token.repository.interface.js";
 import { IPasswordResetTokenRepository } from "./repositories/password-reset-token.repository.interface.js";
@@ -19,6 +19,9 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from ".
 import { toJwtPayload } from "../../common/mappers/jwt.mapper.js";
 import { IJwtPayload } from "../../common/types/index.js";
 import { RefreshTokenRepository } from "./repositories/refresh-token.repository.js";
+import { emailQueue } from "../../jobs/queues/email.queue.js";
+import { APP_URL } from "../../config/env.config.js";
+import { PasswordResetTokenRepository } from "./repositories/password-reset-token.repository.js";
 
 export class AuthService {
     constructor(
@@ -131,13 +134,15 @@ export class AuthService {
             lastUsedAt: new Date(),
         })
 
-        //
         // TODO - message queues
-        // await mailService.sendVerificationEmail(
-        //      user.email,
-        //      verificationToken,
-        // );
-        //
+        await emailQueue.add("verification", {
+            type: "verification",
+            to: user.email,
+            data: {
+                name: user.name,
+                verifyUrl: `${APP_URL}/api/v1/auth/verify-email?token=${verificationToken}`
+            }
+        });
 
         return {
             user: {
@@ -434,6 +439,14 @@ export class AuthService {
             );
         });
 
+        await emailQueue.add("welcome", {
+            type: "welcome",
+            to: user.email,
+            data: {
+                name: user.email,
+            },
+        });
+
         return;
     }
 
@@ -450,8 +463,8 @@ export class AuthService {
             return;
         }
 
-        if (!storedToken.revokedAt) {
-            return;
+        if (storedToken.revokedAt) {
+            return true;
         }
 
         await this.refreshTokenRepo.revoke(
@@ -476,5 +489,167 @@ export class AuthService {
         );
 
         return true;
+    }
+
+    async forgotPassword(data: ForgotPasswordDTO) {
+        const { email } = data;
+
+        const user = await this.userRepo.findByEmail(email);
+
+        if (!user) {
+            return;
+        }
+
+        await this.passwordResetRepo.deleteByUserId(user.id);
+
+        const resetToken = crypto.randomBytes(32).toString("hex");
+
+        const hashedResetToken = hashToken(resetToken);
+
+        const expiresAt = new Date(
+            Date.now() + 1000 * 60 * 60 // 1 hour
+        );
+
+        await this.passwordResetRepo.create({
+            tokenHash: hashedResetToken,
+            userId: user.id,
+            expiresAt,
+        });
+
+        const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
+
+        await emailQueue.add("forgot-password", {
+            type: "forgot-password",
+            to: user.email,
+            data: {
+                name: user.name,
+                resetUrl,
+            },
+        });
+
+        return;
+    }
+
+    async resetPassword(data: ResetPasswordDTO) {
+        const { token, password } = data;
+
+        const tokenHash = hashToken(token);
+
+        const resetToken = await this.passwordResetRepo.findByHash(tokenHash);
+
+        if (!resetToken) {
+            throw new AppError(
+                "Invalid password reset token",
+                400,
+            );
+        }
+
+        if (resetToken.usedAt) {
+            throw new AppError(
+                "Password reset token already used.",
+                400,
+            );
+        }
+
+        if (resetToken.expiresAt < new Date()) {
+            throw new AppError(
+                "Password reset token expired.",
+                400,
+            );
+        }
+
+        const user = await this.userRepo.findById(
+            resetToken.userId,
+        );
+
+        if (!user) {
+            throw new AppError(
+                "User not found.",
+                404,
+            );
+        }
+
+        const hashedPassword = await hashPassword(password);
+
+        await prisma.$transaction(async (tx) => {
+            const userRepository = new UserRepository(tx);
+            const passwordResetRepository = new PasswordResetTokenRepository(tx);
+            const refreshTokenRepository = new RefreshTokenRepository(tx);
+
+            await userRepository.updatePassword(
+                user.id,
+                hashedPassword,
+            );
+
+            await passwordResetRepository.markAsUsed(
+                resetToken.id,
+            );
+
+            await passwordResetRepository.delete(
+                resetToken.id,
+            );
+
+            await refreshTokenRepository.revokeAll(
+                user.id,
+            );
+        });
+
+        await emailQueue.add("password-reset-success", {
+            type: "password-reset-success",
+            to: user.email,
+            data: {
+                name: user.name,
+            },
+        });
+
+        return;
+    }
+
+    async changePassword(data: ChangePasswordDTO, userId: string) {
+        const { currentPassword, newPassword } = data;
+
+        const user = await this.userRepo.findById(userId);
+
+        if (!user) {
+            throw new AppError("User not found.", 404);
+        }
+
+        const isPasswordCorrect = await comparePassword(
+            currentPassword,
+            user.password,
+        );
+
+        if (!isPasswordCorrect) {
+            throw new AppError(
+                "Current password is incorrect.",
+                400,
+            );
+        }
+
+        const hashedNewPassword = await hashPassword(newPassword);
+
+        await prisma.$transaction(async (tx) => {
+            const userRepository = new UserRepository(tx);
+            const refreshTokenRepository = new RefreshTokenRepository(tx);
+
+            await userRepository.updatePassword(
+                user.id,
+                hashedNewPassword,
+            );
+
+            await refreshTokenRepository.revokeAll(
+                user.id,
+            );
+        });
+
+        await emailQueue.add("password-changed", {
+            type: "password-changed",
+            to: user.email,
+            data: {
+                name: user.name,
+            },
+        });
+
+        return;
     }
 }

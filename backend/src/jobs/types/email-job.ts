@@ -31,4 +31,18 @@ export type EmailJob =
             userAgent: string;
             location?: string;
         };
+    }
+    | {
+        type: "password-reset-success";
+        to: string;
+        data: {
+            name: string;
+        };
+    }
+    | {
+        type: "password-changed";
+        to: string;
+        data: {
+            name: string;
+        };
     };

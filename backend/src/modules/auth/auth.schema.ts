@@ -42,6 +42,17 @@ export const forgotPasswordSchema = z
 export const resetPasswordSchema = z
     .object({
         token: z.string(),
+        password: z
+            .string()
+            .min(8, "Password must be at least 8 characters.")
+            .max(64)
+            .regex(/[A-Z]/, "Password must contain one uppercase letter.")
+            .regex(/[a-z]/, "Password must contain one lowercase letter.")
+            .regex(/[0-9]/, "Password must contain one number.")
+            .regex(
+                /[^A-Za-z0-9]/,
+                "Password must contain one special character.",
+            ),
     })
     .strict();
 

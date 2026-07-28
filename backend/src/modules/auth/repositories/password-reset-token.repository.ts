@@ -60,4 +60,14 @@ export class PasswordResetTokenRepository {
             },
         });
     }
+
+    async deleteByUserId(
+        userId: string,
+    ) : Promise<Prisma.BatchPayload> {
+        return this.db.passwordResetToken.deleteMany({
+            where: {
+                userId,
+            }
+        });
+    }
 }

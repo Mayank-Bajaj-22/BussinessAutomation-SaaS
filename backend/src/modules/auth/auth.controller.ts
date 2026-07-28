@@ -137,3 +137,30 @@ export const logoutAllController = CatchAsync(
     }
 );
 
+export const forgotPasswordController = CatchAsync(
+    async (req: Request, res: Response) => {
+        await authService.forgotPassword(req.body);
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "If an account with that email exists, a password reset link has been sent."
+        });
+    }
+);
+
+export const resetPasswordController = CatchAsync(
+    async (req: Request, res: Response) => {
+        await authService.resetPassword(req.body);
+    }
+);
+
+export const changePasswordController = CatchAsync(
+    async (req: Request, res: Response) => {
+        await authService.changePassword(req.body, req.user!.userId!);
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Password changed successfully.",
+        });
+    }
+);

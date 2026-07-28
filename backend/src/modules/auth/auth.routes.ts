@@ -1,7 +1,7 @@
 import express from "express";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { loginUserController, logoutAllController, logoutUserController, refreshTokenController, registerUserController, verifyEmailController } from "./auth.controller.js";
-import { loginUserSchema, logoutUserSchema, refreshTokenSchema, registerUserSchema, verifyEmailSchema } from "./auth.schema.js";
+import { changePasswordController, forgotPasswordController, loginUserController, logoutAllController, logoutUserController, refreshTokenController, registerUserController, verifyEmailController } from "./auth.controller.js";
+import { changePasswordSchema, forgotPasswordSchema, loginUserSchema, logoutUserSchema, refreshTokenSchema, registerUserSchema, verifyEmailSchema } from "./auth.schema.js";
 import { authMiddleware } from "../../common/middlewares/auth.middleware.js";
 
 const router = express.Router();
@@ -29,5 +29,13 @@ router
 router
     .route("/logout-all")
     .post(authMiddleware, logoutAllController);
+
+router
+    .route("forgot-password")
+    .post(validate(forgotPasswordSchema), forgotPasswordController);
+
+router
+    .route("/change-password")
+    .patch(authMiddleware, validate(changePasswordSchema), changePasswordController);
 
 export default router;

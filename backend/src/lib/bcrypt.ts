@@ -51,3 +51,10 @@ export const destroyCookies = (res: Response) => {
         sameSite: "lax",
     });
 }
+
+export const hashToken = (token:string)=>{
+    return crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+}

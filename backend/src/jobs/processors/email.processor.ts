@@ -49,6 +49,20 @@ export async function emailProcessor(
             });
             break;
 
+        case "password-reset-success":
+            await emailService.sendPasswordResetSuccessEmail({
+                to: job.data.to,
+                name: job.data.data.name,
+            });
+            break;
+
+        case "password-changed":
+            await emailService.sendPasswordChangedEmail({
+                to: job.data.to,
+                name: job.data.data.name,
+            });
+            break;
+
         default: {
             const exhaustiveCheck: never = job.data;
             throw new Error(`Unsupported email type: ${JSON.stringify(exhaustiveCheck)}`);
