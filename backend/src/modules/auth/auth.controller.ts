@@ -151,6 +151,11 @@ export const forgotPasswordController = CatchAsync(
 export const resetPasswordController = CatchAsync(
     async (req: Request, res: Response) => {
         await authService.resetPassword(req.body);
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Reset password successfully."
+        });
     }
 );
 
@@ -161,6 +166,64 @@ export const changePasswordController = CatchAsync(
         sendResponse(res, 200, {
             success: true,
             message: "Password changed successfully.",
+        });
+    }
+);
+
+export const getCurrentUserController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const result = await authService.getCurrentUser(
+            req.user!.userId!,
+        );
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Current user fetched successfully.",
+            data: result,
+        });
+    }
+);
+
+export const getSessionsController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const refreshToken = req.cookies?.refreshToken;
+
+        const result = await authService.getSessions(
+            req.user?.userId!,
+            refreshToken,
+        );
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Sessions fetched successfully.",
+            data: result,
+        });
+    }
+);
+
+export const revokeSessionController = CatchAsync(
+    async (req: Request, res: Response) => {
+        await authService.revokeSession(
+            req.user!.userId!,
+            req.params.sessionId as string,
+        );
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Session revoked successfully.",
+        });
+    }
+);
+
+export const resendVerificationController = CatchAsync(
+    async (req: Request, res: Response) => {
+        await authService.resendVerificationEmail(
+            req.user!.userId!,
+        );
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Verification email sent successfully.",
         });
     }
 );

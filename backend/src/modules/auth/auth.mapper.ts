@@ -1,5 +1,5 @@
 import { Membership, Organization, User } from "@prisma/client";
-import { AuthResponseDTO, OrganizationResponseDTO, UserResponseDTO } from "./auth.response.js";
+import { AuthResponseDTO, MembershipResponseDTO, OrganizationResponseDTO, UserResponseDTO } from "./auth.response.js";
 
 export const toUserResponse = (
     user: User,
@@ -28,6 +28,17 @@ export const toOrganizationResponse = (
         status: organization.status,
         createdAt: organization.createdAt,
         updatedAt: organization.updatedAt,
+    }
+}
+
+export const toMembershipResponse = (
+    membership: Membership,
+) : MembershipResponseDTO => {
+    return {
+        id: membership.id,
+        role: membership.role,
+        status: membership.status,
+        joinedAt: membership.joinedAt,
     }
 }
 

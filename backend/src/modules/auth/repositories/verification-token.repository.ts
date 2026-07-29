@@ -60,4 +60,14 @@ export class VerificationTokenRepository {
             },
         });
     }
+
+    async deleteByUserId(
+        userId: string,
+    ): Promise<void> {
+        await this.db.verificationToken.deleteMany({
+            where: {
+                userId,
+            },
+        });
+    }
 }

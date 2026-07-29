@@ -6,7 +6,7 @@ import { IMembershipRepository } from "../membership/membership.repository.inter
 import { IOrganizationRepository } from "../organization/organization.repository.interface.js";
 import { IUserRepository } from "../user/user.repository.interface.js";
 import { ChangePasswordDTO, ForgotPasswordDTO, LoginUserDTO, LogoutUserDTO, RefreshTokenDTO, RegisterUserDTO, ResetPasswordDTO, VerifyEmailDTO } from "./auth.schema.js";
-import crypto from "crypto";
+import crypto, { randomBytes } from "crypto";
 import { IRefreshTokenRepository } from "./repositories/refresh-token.repository.interface.js";
 import { IPasswordResetTokenRepository } from "./repositories/password-reset-token.repository.interface.js";
 import { IVerificationTokenRepository } from "./repositories/verification-token.repository.interface.js";
@@ -22,6 +22,8 @@ import { RefreshTokenRepository } from "./repositories/refresh-token.repository.
 import { emailQueue } from "../../jobs/queues/email.queue.js";
 import { APP_URL } from "../../config/env.config.js";
 import { PasswordResetTokenRepository } from "./repositories/password-reset-token.repository.js";
+import { toMembershipResponse, toOrganizationResponse, toUserResponse } from "./auth.mapper.js";
+import { SessionsResponseDTO } from "./auth.response.js";
 
 export class AuthService {
     constructor(
@@ -651,5 +653,175 @@ export class AuthService {
         });
 
         return;
+    }
+
+    async getCurrentUser(userId: string) {
+        const user = await this.userRepo.findById(userId);
+
+        if (!user) {
+            throw new AppError("User not found.", 404);
+        }
+
+        if (user.deletedAt) {
+            throw new AppError("User account has been deleted.", 400);
+        }
+
+        if (user.status !== "ACTIVE") {
+            throw new AppError("User account is inactive.", 403);
+        }
+
+        const membership = 
+            await this.membershipRepo.findActiveMembershipWithOrganization(user.id);
+
+        if (!membership) {
+            throw new AppError("No active organization found.", 403);
+        }
+
+        if (membership.organization.status !== "ACTIVE") {
+            throw new AppError("Organization is inactive.", 403);
+        }
+
+        return {
+            user: toUserResponse(user),
+            organization: toOrganizationResponse(membership.organization),
+            membership: toMembershipResponse(membership),
+        }
+    }
+
+    async getSessions(
+        userId: string,
+        currentRefreshToken?: string,
+    ) : Promise<SessionsResponseDTO> {
+        const user = await this.userRepo.findById(userId);
+
+        if (!user) {
+            throw new AppError(
+                "User not found.",
+                404,
+            );
+        }
+
+        const sessions = await this.refreshTokenRepo.findAllActiveByUserId(user.id);
+
+        let currentSessionId: string | null = null;
+
+        if (currentRefreshToken) {
+            const tokenHash = 
+                hashRefreshToken(currentRefreshToken);
+
+            const currentSession = 
+                await this.refreshTokenRepo.findByHash(tokenHash);
+
+            currentSessionId = currentSession?.id ?? null;
+        }
+
+        return {
+            sessions: sessions.map((session) => ({
+                sessionId: session.sessionId,
+                deviceName: session.deviceName,
+                ipAddress: session.ipAddress,
+                userAgent: session.userAgent,
+                lastUsedAt: session.lastUsedAt,
+                createdAt: session.createdAt,
+                isCurrent: 
+                    session.id === currentSessionId,
+            })),
+        };
+    }
+
+    async revokeSession(
+        userId: string,
+        sessionId: string,
+    ) {
+        const session =
+            await this.refreshTokenRepo.findBySessionId(
+                sessionId,
+            );
+
+        if (!session) {
+            throw new AppError(
+                "Session not found.",
+                404,
+            );
+        }
+
+        if (session.userId !== userId) {
+            throw new AppError(
+                "You are not authorized to revoke this session.",
+                403,
+            );
+        }
+
+        if (session.revokedAt) {
+            throw new AppError(
+                "Session has already been revoked.",
+                400,
+            );
+        }
+
+        await this.refreshTokenRepo.revoke(
+            session.id,
+        );
+    }
+
+    async resendVerificationEmail(
+        userId: string,
+    ) : Promise<void> {
+        const user = await this.userRepo.findById(userId);
+
+        if (!user) {
+            throw new AppError(
+                "User not found.",
+                404,
+            );
+        }
+
+        if (user.deletedAt) {
+            throw new AppError(
+                "User account has been deleted.",
+                403,
+            );
+        }
+
+        if (user.status !== "ACTIVE") {
+            throw new AppError(
+                "User account is inactive.",
+                403,
+            );
+        }
+
+        if (user.isEmailVerified) {
+            throw new AppError(
+                "Email is already verified.",
+                400,
+            );
+        }
+
+        await this.verificationTokenRepo.deleteByUserId(
+            user.id
+        );
+
+        const rawToken = randomBytes(32).toString("hex");
+
+        const tokenHash = hashToken(rawToken);
+
+        const expiresAt = new Date(
+            Date.now() + 1000 * 60 * 60 * 24,
+        );
+
+        await this.verificationTokenRepo.create({
+            userId: user.id,
+            tokenHash,
+            expiresAt,
+        });
+
+        await emailQueue.add("verification", {
+            type: "verification",
+            to: user.email,
+            data: {
+                name: user.name,
+                verifyUrl: `${APP_URL}/api/v1/auth/verify-email?token=${rawToken}`
+            }
+        });
     }
 }

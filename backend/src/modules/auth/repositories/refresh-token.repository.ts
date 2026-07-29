@@ -109,4 +109,28 @@ export class RefreshTokenRepository {
             }
         })
     }
+
+    async findAllActiveByUserId(
+        userId: string,
+    ) : Promise<RefreshToken[]> {
+        return this.db.refreshToken.findMany({
+            where: {
+                userId,
+                revokedAt: null,
+            },
+            orderBy: {
+                lastUsedAt: "desc",
+            },
+        });
+    }
+
+    async findBySessionId(
+        sessionId: string,
+    ): Promise<RefreshToken | null> {
+        return this.db.refreshToken.findFirst({
+            where: {
+                sessionId,
+            },
+        });
+    }
 }

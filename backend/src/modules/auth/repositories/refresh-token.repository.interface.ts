@@ -38,4 +38,12 @@ export interface IRefreshTokenRepository {
     updateLastUsed(
         refreshTokenId: string,
     ) : Promise<RefreshToken>;
+
+    findAllActiveByUserId(
+        userId: string,
+    ) : Promise<RefreshToken[]>;
+
+    findBySessionId(
+        sessionId: string,
+    ): Promise<RefreshToken | null>;
 }

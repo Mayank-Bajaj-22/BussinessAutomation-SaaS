@@ -20,4 +20,8 @@ export interface IVerificationTokenRepository {
     ) : Promise<VerificationToken>;
 
     deleteExpired() : Promise<Prisma.BatchPayload>;
+
+    deleteByUserId(
+        userId: string,
+    ): Promise<void>;
 }

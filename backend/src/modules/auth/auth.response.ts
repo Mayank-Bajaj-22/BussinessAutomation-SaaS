@@ -32,3 +32,17 @@ export interface MembershipResponseDTO {
     status: string;
     joinedAt: Date;
 }
+
+export interface SessionResponseDTO {
+    sessionId: string;
+    deviceName: string,
+    ipAddress: string;
+    userAgent: string;
+    lastUsedAt: Date,
+    createdAt: Date;
+    isCurrent: boolean;
+}
+
+export interface SessionsResponseDTO {
+    sessions: SessionResponseDTO[];
+}
