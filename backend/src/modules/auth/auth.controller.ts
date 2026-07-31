@@ -55,6 +55,8 @@ export const loginUserController = CatchAsync(
             },
         );
 
+        setCookies(res, result.accessToken, result.refreshToken);
+
         sendResponse(res, 200, {
             success: true,
             message: "User logged in successfully.",

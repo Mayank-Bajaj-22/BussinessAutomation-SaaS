@@ -1,10 +1,13 @@
+import { MembershipStatus, OrganizationStatus, UserStatus } from "@prisma/client";
+import { OrganizationResponseDTO } from "../organization/organization.response.js";
+
 export interface UserResponseDTO {
     id: string;
     name: string;
     email: string;
     avatarUrl: string | null;
     isEmailVerified: boolean;
-    status: string;
+    status: UserStatus;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -15,21 +18,10 @@ export interface AuthResponseDTO {
     membership: MembershipResponseDTO;
 }
 
-export interface OrganizationResponseDTO {
-    id: string;
-    name: string;
-    slug: string;
-    timezone: string;
-    address: string | null;
-    status: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
 export interface MembershipResponseDTO {
     id: string;
     role: string;
-    status: string;
+    status: MembershipStatus;
     joinedAt: Date;
 }
 

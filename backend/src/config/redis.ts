@@ -1,5 +1,5 @@
 import { Redis } from "ioredis";
-import { logger } from "./logger.js";
+import { logger } from "../config/logger.js";
 
 /**
  * Redis Connection
@@ -11,21 +11,21 @@ import { logger } from "./logger.js";
  */
 
 export const redisConnection = new Redis({
-    host: "127.0.0.1",
-    port: 6379,
+  host: "127.0.0.1",
+  port: 6379,
 
-    // BullMQ requires this option
-    maxRetriesPerRequest: null,
+  // BullMQ requires this option
+  maxRetriesPerRequest: null,
 });
 
 redisConnection.on("connect", () => {
-    logger.info("Redis Connected.");
+  logger.info("Redis Connected.");
 });
 
 redisConnection.on("error", (err: Error) => {
-    logger.error(`Redis Connection Error: ${err.message}`);
+  logger.error(`Redis Connection Error: ${err.message}`);
 });
 
 redisConnection.on("close", () => {
-    logger.warn("Redis Connection Closed.");
+  logger.warn("Redis Connection Closed.");
 });

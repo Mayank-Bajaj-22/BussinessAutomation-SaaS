@@ -1,4 +1,4 @@
-import { Organization, Prisma, PrismaClient } from "@prisma/client";
+import { Organization, OrganizationStatus, Prisma, PrismaClient } from "@prisma/client";
 import { IOrganizationRepository } from "./organization.repository.interface.js";
 import { prisma } from "../../lib/prisma.js";
 
@@ -57,7 +57,7 @@ export class OrganizationRepository implements IOrganizationRepository {
                 id: organizationId,
             },
             data: {
-                status: "INACTIVE",
+                status: OrganizationStatus.INACTIVE,
                 deletedAt: new Date(),
             },
         });

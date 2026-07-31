@@ -17,13 +17,13 @@ import { VerificationTokenRepository } from "./repositories/verification-token.r
 import { MembershipRole } from "@prisma/client";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../lib/jwt.js";
 import { toJwtPayload } from "../../common/mappers/jwt.mapper.js";
-import { IJwtPayload } from "../../common/types/index.js";
 import { RefreshTokenRepository } from "./repositories/refresh-token.repository.js";
 import { emailQueue } from "../../jobs/queues/email.queue.js";
 import { APP_URL } from "../../config/env.config.js";
 import { PasswordResetTokenRepository } from "./repositories/password-reset-token.repository.js";
-import { toMembershipResponse, toOrganizationResponse, toUserResponse } from "./auth.mapper.js";
+import { toMembershipResponse, toUserResponse } from "./auth.mapper.js";
 import { SessionsResponseDTO } from "./auth.response.js";
+import { toOrganizationResponse } from "../organization/organization.mapper.js";
 
 export class AuthService {
     constructor(
@@ -196,12 +196,12 @@ export class AuthService {
             throw new AppError("User account is inactive.", 403);
         }
 
-        // if (!user.isEmailVerified) {
-        //     throw new AppError(
-        //         "Please verify your email first.",
-        //         403,
-        //     );
-        // }
+        if (!user.isEmailVerified) {
+            throw new AppError(
+                "Please verify your email first.",
+                403,
+            );
+        }
 
         const membership = await this.membershipRepo.findActiveMembershipWithOrganization(user.id);
 
@@ -571,6 +571,18 @@ export class AuthService {
             );
         }
 
+        const isSamePassword = await comparePassword(
+            password,
+            user.password,
+        );
+
+        if (isSamePassword) {
+            throw new AppError(
+                "New password must be different from your current password.",
+                400,
+            );
+        }
+
         const hashedPassword = await hashPassword(password);
 
         await prisma.$transaction(async (tx) => {
@@ -624,6 +636,17 @@ export class AuthService {
         if (!isPasswordCorrect) {
             throw new AppError(
                 "Current password is incorrect.",
+                400,
+            );
+        }
+
+        const isSamePassword = await comparePassword(
+            newPassword, user.password,
+        );
+
+        if (isSamePassword) {
+            throw new AppError(
+                "New password must be different from your current password.",
                 400,
             );
         }

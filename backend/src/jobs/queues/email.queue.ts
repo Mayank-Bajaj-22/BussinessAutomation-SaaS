@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
 import { EmailJob } from "../types/email-job.js";
-import { redisConnection } from "../../config/redis.js";
+import { redisConnection } from "../../lib/redis.js";
 
 /**
  * Email Queue
@@ -10,20 +10,20 @@ import { redisConnection } from "../../config/redis.js";
  */
 
 export const emailQueue = new Queue<EmailJob>("email", {
-    connection: redisConnection,
+  connection: redisConnection,
 
-    prefix: "bussiness-automation",
+  prefix: "bussiness-automation",
 
-    defaultJobOptions: {
-        attempts: 3,
+  defaultJobOptions: {
+    attempts: 3,
 
-        backoff: {
-            type: "exponential",
-            delay: 2000,
-        },
-
-        removeOnComplete: 100,
-
-        removeOnFail: 500,
+    backoff: {
+      type: "exponential",
+      delay: 2000,
     },
+
+    removeOnComplete: 100,
+
+    removeOnFail: 500,
+  },
 });

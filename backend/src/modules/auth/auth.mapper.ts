@@ -1,5 +1,6 @@
 import { Membership, Organization, User } from "@prisma/client";
-import { AuthResponseDTO, MembershipResponseDTO, OrganizationResponseDTO, UserResponseDTO } from "./auth.response.js";
+import { AuthResponseDTO, MembershipResponseDTO, UserResponseDTO } from "./auth.response.js";
+import { toOrganizationResponse } from "../organization/organization.mapper.js";
 
 export const toUserResponse = (
     user: User,
@@ -13,21 +14,6 @@ export const toUserResponse = (
         isEmailVerified: user.isEmailVerified,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
-    }
-}
-
-export const toOrganizationResponse = (
-    organization: Organization,
-) : OrganizationResponseDTO => {
-    return {
-        id: organization.id,
-        name: organization.name,
-        slug: organization.slug,
-        timezone: organization.timezone,
-        address: organization.address,
-        status: organization.status,
-        createdAt: organization.createdAt,
-        updatedAt: organization.updatedAt,
     }
 }
 

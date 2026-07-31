@@ -31,7 +31,7 @@ router
     .post(authMiddleware, logoutAllController);
 
 router
-    .route("forgot-password")
+    .route("/forgot-password")
     .post(validate(forgotPasswordSchema), forgotPasswordController);
 
 router
