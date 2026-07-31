@@ -16,3 +16,19 @@ export const getCurrentOrganizationController = CatchAsync(
         });
     }
 );
+
+export const updateCurrentOrganizationController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const result = 
+            await organizationService.updateOrganization(
+                req.user?.organizationId!,
+                req.body
+            );
+        
+        return sendResponse(res, 200, {
+            success: true,
+            message: "Organization updated successfully.",
+            data: result,
+        });
+    }
+);

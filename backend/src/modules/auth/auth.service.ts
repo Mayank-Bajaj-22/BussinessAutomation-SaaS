@@ -24,6 +24,7 @@ import { PasswordResetTokenRepository } from "./repositories/password-reset-toke
 import { toMembershipResponse, toUserResponse } from "./auth.mapper.js";
 import { SessionsResponseDTO } from "./auth.response.js";
 import { toOrganizationResponse } from "../organization/organization.mapper.js";
+import { OrganizationSettingsRepository } from "../organization-settings/organization-settings.repository.js";
 
 export class AuthService {
     constructor(
@@ -72,6 +73,7 @@ export class AuthService {
             const organizationRepository = new OrganizationRepository(tx);
             const membershipRepository = new MembershipRepository(tx);
             const verificationTokenRepository = new VerificationTokenRepository(tx);
+            const organizationSettingsRepository = new OrganizationSettingsRepository(tx);
 
             const user = await userRepository.create({
                 name,
@@ -82,7 +84,17 @@ export class AuthService {
             const organization = await organizationRepository.create({
                 name: organizationName,
                 slug: organizationSlug,
+            });
+
+            const organizationSettings = await organizationSettingsRepository.create({
+                organization: {
+                    connect: {
+                        id: organization.id,
+                    },
+                },
                 timezone,
+                currency: "INR",
+                language: "en",
             });
 
             const membership = await membershipRepository.create({
@@ -109,6 +121,7 @@ export class AuthService {
                 user,
                 organization,
                 membership,
+                organizationSettings,
             }
         });
 

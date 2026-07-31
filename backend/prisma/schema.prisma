@@ -29,6 +29,28 @@ enum MembershipStatus {
   SUSPENDED
 }
 
+enum Currency {
+  INR
+  USD
+  EUR
+}
+
+enum Language {
+  hi
+  en
+  fr
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 model User {
   id                  String              @id @default(uuid())
   name                String
@@ -54,23 +76,55 @@ model User {
 }
 
 model Organization {
+  id                          String              @id @default(uuid())
+  name                        String
+  slug                        String              @unique
+  address                     String?
+  logoUrl                     String?
+  website                     String?
+  phone                       String?
+
+  status                      OrganizationStatus  @default(ACTIVE)
+
+  deletedAt                   DateTime?
+
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+
+  memberships                 Membership[]
+  settings                    OrganizationSettings?
+  workingHours                OrganizationWorkingHour[]
+
+  @@index([name])
+}
+
+model OrganizationSettings {
   id                String              @id @default(uuid())
-  name              String
-  slug              String              @unique
+  organizationId    String              @unique
+
+  currency          String              @default("INR")
+  language          String              @default("en")
   timezone          String
-  address           String?
-  logoUrl           String?
-
-  status            OrganizationStatus  @default(ACTIVE)
-
-  deletedAt         DateTime?
 
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
-  memberships       Membership[]
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
 
-  @@index([name])
+model OrganizationWorkingHour {
+  id                String              @id @default(uuid())
+  organizationId    String
+
+  dayOfWeek         DayOfWeek
+  openTime          String
+  closeTime         String
+  isClosed          Boolean             @default(false)
+
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, dayOfWeek])
+  @@index([organizationId])
 }
 
 model Membership {
