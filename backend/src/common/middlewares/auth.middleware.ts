@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../errors/AppError.js";
 import { verifyAccessToken } from "../../lib/jwt.js";
-import { IJwtPayload } from "../types/index.js";
 import { prisma } from "../../lib/prisma.js";
 import { UserStatus } from "@prisma/client";
 
@@ -69,6 +68,7 @@ export const authMiddleware = async (
             userId: payload.userId,
             email: payload.email,
             organizationId: payload.organizationId,
+            membershipId: payload.membershipId,
             role: payload.role,
         }
 

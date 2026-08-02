@@ -11,6 +11,7 @@ export interface IJwtPayload extends JwtPayload {
     userId: string;
     organizationId: string;
     membershipRole: MembershipRole;
+    membershipId: string;
     email: string;
     isEmailVerified: boolean;
 }

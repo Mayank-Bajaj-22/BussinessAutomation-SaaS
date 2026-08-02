@@ -10,6 +10,7 @@ export const toJwtPayload = (
         userId: user.id,
         organizationId: organization.id,
         membershipRole: membership.role,
+        membershipId: membership.id,
         email: user.email,
         isEmailVerified: user.isEmailVerified,
     }

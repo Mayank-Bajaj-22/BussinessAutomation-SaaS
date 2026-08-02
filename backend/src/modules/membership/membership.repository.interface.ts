@@ -1,4 +1,4 @@
-import { Membership, MembershipRole, Prisma } from "@prisma/client";
+import { Membership, MembershipRole, Organization, Prisma, User } from "@prisma/client";
 import { MembershipWithOrganization } from "../../common/types/index.js";
 
 export interface IMembershipRepository {
@@ -44,5 +44,12 @@ export interface IMembershipRepository {
     findActiveMembershipWithOrganization(
         userId: string,
         organizationId?: string,
-    ) : Promise<MembershipWithOrganization | null>;
+    ) : Promise<
+        (
+            Membership & {
+                user: User;
+                organization: Organization;
+            }
+        ) | null
+    >;
 }

@@ -229,3 +229,37 @@ export const resendVerificationController = CatchAsync(
         });
     }
 );
+
+export const switchOrganizationController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const userId = req.user?.userId!;
+        const organizationId = req.params.organizationId as string;
+
+        const result = 
+            await authService.switchOrganization(
+                {
+                    userId,
+                    organizationId,
+                },
+                {
+                    deviceName:
+                        req.headers["x-device-name"]?.toString() ??
+                        "Unknown Device",
+
+                    ipAddress:
+                        req.ip ?? "",
+
+                    userAgent:
+                        req.headers["user-agent"]?.toString() ?? "",
+                },
+            );
+
+        setCookies(res, result.accessToken, result.refreshToken);
+        
+        sendResponse(res, 200, {
+            success: true,
+            message: "Organization switched successfully.",
+            data: result,
+        });
+    }
+)

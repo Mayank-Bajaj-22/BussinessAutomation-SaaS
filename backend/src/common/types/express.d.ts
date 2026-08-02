@@ -7,6 +7,7 @@ declare global {
                 requestId?: string;
                 userId?: string;
                 organizationId?: string;
+                membershipId?: string;
                 role: string;
                 email: string;
             },

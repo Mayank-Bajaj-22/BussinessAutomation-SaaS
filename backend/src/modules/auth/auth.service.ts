@@ -14,7 +14,7 @@ import { UserRepository } from "../user/user.repository.js";
 import { OrganizationRepository } from "../organization/organization.repository.js";
 import { MembershipRepository } from "../membership/membership.repository.js";
 import { VerificationTokenRepository } from "./repositories/verification-token.repository.js";
-import { MembershipRole } from "@prisma/client";
+import { MembershipRole, OrganizationStatus, UserStatus } from "@prisma/client";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../lib/jwt.js";
 import { toJwtPayload } from "../../common/mappers/jwt.mapper.js";
 import { RefreshTokenRepository } from "./repositories/refresh-token.repository.js";
@@ -859,5 +859,103 @@ export class AuthService {
                 verifyUrl: `${APP_URL}/api/v1/auth/verify-email?token=${rawToken}`
             }
         });
+    }
+
+    async switchOrganization(
+        payload: {
+            userId: string;
+            organizationId: string;
+        },
+        metadata: {
+            deviceName: string;
+            ipAddress: string;
+            userAgent: string;
+        },
+    ) {
+        const membership =
+            await this.membershipRepo.findActiveMembershipWithOrganization(
+                payload.userId,
+                payload.organizationId,
+            );
+
+        if (!membership) {
+            throw new AppError(
+                "You are not a member of this organization.",
+                403,
+            );
+        }
+
+        if (membership.organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                403,
+            );
+        }
+
+        if (membership.organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                403,
+            );
+        }
+
+        if (membership.user.deletedAt) {
+            throw new AppError(
+                "User account has been deleted.",
+                403,
+            );
+        }
+
+        if (membership.user.status !== UserStatus.ACTIVE) {
+            throw new AppError(
+                "User account is inactive.",
+                403,
+            );
+        }
+
+        const jwtPayload = toJwtPayload(membership.user, membership.organization, membership);
+
+        const accessToken =
+            generateAccessToken(jwtPayload);
+
+        const refreshToken =
+            generateRefreshToken(jwtPayload);
+
+        const hashedRefreshToken =
+            hashRefreshToken(refreshToken);
+
+        const refreshExpiresAt = new Date(
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
+        );
+
+        await this.refreshTokenRepo.create({
+            tokenHash: hashedRefreshToken,
+            userId: membership.user.id,
+            expiresAt: refreshExpiresAt,
+
+            deviceName: metadata.deviceName,
+            ipAddress: metadata.ipAddress,
+            userAgent: metadata.userAgent,
+
+            sessionId: crypto.randomUUID(),
+            lastUsedAt: new Date(),
+        });
+
+        return {
+            organization: {
+                id: membership.organization.id,
+                name: membership.organization.name,
+                slug: membership.organization.slug,
+            },
+
+            membership: {
+                id: membership.id,
+                role: membership.role,
+                status: membership.status,
+            },
+
+            accessToken,
+            refreshToken,
+        };
     }
 }

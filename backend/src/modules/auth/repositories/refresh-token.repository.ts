@@ -40,6 +40,7 @@ export class RefreshTokenRepository {
         return this.db.refreshToken.update({
             where: {
                 id: refreshTokenId,
+                revokedAt: null,
             },
             data: {
                 revokedAt: new Date(),

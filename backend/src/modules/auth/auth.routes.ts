@@ -1,6 +1,6 @@
 import express from "express";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { changePasswordController, forgotPasswordController, getCurrentUserController, getSessionsController, loginUserController, logoutAllController, logoutUserController, refreshTokenController, registerUserController, resendVerificationController, revokeSessionController, verifyEmailController } from "./auth.controller.js";
+import { changePasswordController, forgotPasswordController, getCurrentUserController, getSessionsController, loginUserController, logoutAllController, logoutUserController, refreshTokenController, registerUserController, resendVerificationController, revokeSessionController, switchOrganizationController, verifyEmailController } from "./auth.controller.js";
 import { changePasswordSchema, forgotPasswordSchema, loginUserSchema, logoutUserSchema, refreshTokenSchema, registerUserSchema, verifyEmailSchema } from "./auth.schema.js";
 import { authMiddleware } from "../../common/middlewares/auth.middleware.js";
 
@@ -53,5 +53,9 @@ router
 router
     .route("/resend-verification")
     .post(authMiddleware, resendVerificationController);
+
+router
+    .route("/:organizationId/switch")
+    .post(authMiddleware, switchOrganizationController);
 
 export default router;
