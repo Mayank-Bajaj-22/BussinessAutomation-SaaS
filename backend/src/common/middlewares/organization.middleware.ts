@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../errors/AppError.js";
 import { MembershipRepository } from "../../modules/membership/membership.repository.js";
+import { OrganizationStatus } from "@prisma/client";
 
 const membershipRepository = new MembershipRepository();
 
@@ -49,7 +50,7 @@ export const organizationMiddleware = async (
             );
         }
 
-        if (membership.organization.status !== "ACTIVE") {
+        if (membership.organization.status !== OrganizationStatus.ACTIVE) {
             throw new AppError(
                 "Organization is inactive.",
                 403,

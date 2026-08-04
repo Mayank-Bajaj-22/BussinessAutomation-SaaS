@@ -145,6 +145,8 @@ model Membership {
   user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  invitationTokens  MembershipInvitationToken[]
+
   @@unique([userId, organizationId])
   @@index([userId])
   @@index([status])
@@ -206,3 +208,23 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
 } 
+
+model MembershipInvitationToken {
+  id                String            @id @default(uuid())
+
+  tokenHash         String            @unique
+
+  membershipId      String
+  invitedEmail      String
+
+  expiresAt         DateTime
+  usedAt            DateTime?
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  membership        Membership        @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([membershipId])
+  @@index([expiresAt])
+}

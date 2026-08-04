@@ -1,7 +1,7 @@
 import express from "express";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { changePasswordController, forgotPasswordController, getCurrentUserController, getSessionsController, loginUserController, logoutAllController, logoutUserController, refreshTokenController, registerUserController, resendVerificationController, revokeSessionController, switchOrganizationController, verifyEmailController } from "./auth.controller.js";
-import { changePasswordSchema, forgotPasswordSchema, loginUserSchema, logoutUserSchema, refreshTokenSchema, registerUserSchema, verifyEmailSchema } from "./auth.schema.js";
+import { changePasswordController, forgotPasswordController, getCurrentUserController, getSessionsController, loginUserController, logoutAllController, logoutUserController, refreshTokenController, registerUserController, resendVerificationController, resetPasswordController, revokeSessionController, switchOrganizationController, verifyEmailController } from "./auth.controller.js";
+import { changePasswordSchema, forgotPasswordSchema, loginUserSchema, logoutUserSchema, refreshTokenSchema, registerUserSchema, resetPasswordSchema, verifyEmailSchema } from "./auth.schema.js";
 import { authMiddleware } from "../../common/middlewares/auth.middleware.js";
 
 const router = express.Router();
@@ -28,11 +28,15 @@ router
 
 router
     .route("/logout-all")
-    .post(authMiddleware, logoutAllController);
+    .delete(authMiddleware, logoutAllController);
 
 router
     .route("/forgot-password")
     .post(validate(forgotPasswordSchema), forgotPasswordController);
+
+router
+    .route("/reset-password")
+    .post(authMiddleware, validate(resetPasswordSchema), resetPasswordController);
 
 router
     .route("/change-password")
