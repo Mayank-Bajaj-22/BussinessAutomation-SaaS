@@ -5,13 +5,13 @@ import { OrganizationStatus } from "@prisma/client";
 
 const membershipRepository = new MembershipRepository();
 
-interface OrganizationParams {
-    organizationId: string;
+type OrganizationParams = {
+    organizationId?: string;
 }
 
 export const organizationMiddleware = async (
     req: Request<OrganizationParams>,
-    res: Response,
+    _res: Response,
     next: NextFunction,
 ) => {
     try {

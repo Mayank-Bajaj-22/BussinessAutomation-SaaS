@@ -1,6 +1,7 @@
 import { sendMail } from "../../lib/mail.js";
 import { forgotPasswordTemplate } from "./templates/forgot-password.template.js";
 import { loginAlertTemplate } from "./templates/login-alert.template.js";
+import { membershipInvitationTemplate } from "./templates/membership-invitation.template.js";
 import { passwordChangedTemplate } from "./templates/password-changed.template.js";
 import { passwordResetSuccessTemplate } from "./templates/password-reset-success.template.js";
 import { verificationTemplate } from "./templates/verification.template.js";
@@ -91,6 +92,25 @@ class EmailService {
             subject: "Password Changed",
             html: passwordChangedTemplate({
                 name: params.name,
+            }),
+        });
+    }
+
+    async sendInvitationEmail(params: {
+        to: string;
+        inviterName: string;
+        organizationName: string;
+        invitationUrl: string;
+        role: string;
+    }) : Promise<void> {
+        await sendMail({
+            to: params.to,
+            subject: `Invitation to join ${params.organizationName}`,
+            html: membershipInvitationTemplate({
+                inviterName: params.inviterName,
+                organizationName: params.organizationName,
+                invitationUrl: params.invitationUrl,
+                role: params.role,
             }),
         });
     }

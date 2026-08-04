@@ -45,4 +45,14 @@ export type EmailJob =
         data: {
             name: string;
         };
+    }
+    | {
+        type: "membership-invitation";
+        to: string;
+        data: {
+            inviterName: string;
+            organizationName: string;
+            invitationUrl: string;
+            role: string;
+        }
     };

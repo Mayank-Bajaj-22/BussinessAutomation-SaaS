@@ -63,6 +63,16 @@ export async function emailProcessor(
             });
             break;
 
+        case "membership-invitation":
+            await emailService.sendInvitationEmail({
+                to: job.data.to,
+                inviterName: job.data.data.inviterName,
+                organizationName: job.data.data.organizationName,
+                invitationUrl: job.data.data.invitationUrl,
+                role: job.data.data.role,
+            });
+            break;
+
         default: {
             const exhaustiveCheck: never = job.data;
             throw new Error(`Unsupported email type: ${JSON.stringify(exhaustiveCheck)}`);
