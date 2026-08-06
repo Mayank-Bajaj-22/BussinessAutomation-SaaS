@@ -1,6 +1,6 @@
-import { MembershipStatus, Organization, OrganizationStatus, UserStatus } from "@prisma/client";
+import { Membership, MembershipStatus, Organization, OrganizationStatus, UserStatus } from "@prisma/client";
 import { IMembershipRepository } from "./membership.repository.interface.js";
-import { InviteMemberDto } from "./membership.schema.js";
+import { AcceptInvitationDTO, InviteMemberDto, RejectInvitationDTO } from "./membership.schema.js";
 import { IMembershipInvitationRepository } from "../membership-invitation/membership-invitation.repository.interface.js";
 import { IUserRepository } from "../user/user.repository.interface.js";
 import { AppError } from "../../common/errors/AppError.js";
@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { hashToken } from "../../lib/bcrypt.js";
 import { APP_URL } from "../../config/env.config.js";
 import { emailQueue } from "../../jobs/queues/email.queue.js";
-import { toInviteMemberResponse } from "./membership.mapper.js";
+import { toAcceptInvitationResponse, toInviteMemberResponse, toRejectInvitationResponse } from "./membership.mapper.js";
 
 export class MembershipService {
     constructor(
@@ -82,18 +82,42 @@ export class MembershipService {
                 organization.id,
             );
 
-        if (membership && membership.status !== MembershipStatus.INVITED) {
+        if (membership?.status === MembershipStatus.ACTIVE) {
             throw new AppError(
                 "User is already a member of this organization.",
                 409,
             );
         }
 
-        if (membership && membership.status === MembershipStatus.INVITED) {
+        if (membership?.status === MembershipStatus.SUSPENDED) {
             throw new AppError(
-                "Invitation has already been sent.",
-                409,
+                "Membership is suspended.",
+                403,
             );
+        }
+
+        if (membership?.status === MembershipStatus.INVITED) {
+            const invitation =
+                await this.membershipInvitationRepo.findByMembershipId(
+                    membership.id,
+                );
+
+            if (!invitation) {
+                throw new AppError(
+                    "Invitation token not found.",
+                    500,
+                );
+            }
+
+            const expired =
+                invitation.expiresAt.getTime() < Date.now();
+
+            if (!expired) {
+                throw new AppError(
+                    "Invitation has already been sent.",
+                    409,
+                );
+            }
         }
 
         const invitationToken = crypto.randomBytes(32).toString("hex");
@@ -102,54 +126,103 @@ export class MembershipService {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
 
-        const createdMembership = await prisma.$transaction(async (tx) => {
-            const membershipRepo = new MembershipRepository(tx);
-            const invitationRepo = new MembershipInvitationRepository(tx);
+        let createdMembership: Membership;
 
-            const membership = await membershipRepo.create({
-                role: data.role,
-                status: MembershipStatus.INVITED,
-                invitedBy: {
-                    connect: {
-                        id: inviterUserId,
+        if (!membership) {
+            createdMembership = await prisma.$transaction(async (tx) => {
+                const membershipRepo = new MembershipRepository(tx);
+                const invitationRepo = new MembershipInvitationRepository(tx);
+
+                const created = await membershipRepo.create({
+                    role: data.role,
+                    status: MembershipStatus.INVITED,
+                    invitedBy: {
+                        connect: {
+                            id: inviterUserId,
+                        },
                     },
-                },
-                user: {
-                    connect: {
-                        id: user.id,
+                    user: {
+                        connect: {
+                            id: user.id,
+                        },
                     },
-                },
-                organization: {
-                    connect: {
-                        id: organization.id,
+                    organization: {
+                        connect: {
+                            id: organization.id,
+                        },
+                    }
+                });
+
+                await invitationRepo.create({
+                    tokenHash,
+                    invitedEmail: user.email,
+                    expiresAt,
+                    membership: {
+                        connect: {
+                            id: created.id,
+                        },
                     },
-                }
+                });
+
+                return created;
             });
+        } else if (membership.status === MembershipStatus.INVITED) {
+            createdMembership = await prisma.$transaction(async (tx) => {
+                const invitationRepo = new MembershipInvitationRepository(tx);
 
-            await invitationRepo.create({
-                tokenHash,
-                invitedEmail: user.email,
-                expiresAt,
-                membership: {
-                    connect: {
-                        id: membership.id,
-                    },
-                },
+                await invitationRepo.refreshInvitation(
+                    membership.id,
+                    tokenHash,
+                    user.email,
+                    expiresAt,
+                );
+
+                return membership;
             });
+        } else if (membership.status === MembershipStatus.REJECTED) {
+            createdMembership = await prisma.$transaction(async (tx) => {
+                const membershipRepo = new MembershipRepository(tx);
+                const invitationRepo = new MembershipInvitationRepository(tx);
 
-            return membership;
-        });
+                const updatedMembership = await membershipRepo.reInvite(
+                    membership.id,
+                    data.role,
+                    inviterUserId,
+                );
+
+                await invitationRepo.refreshInvitation(
+                    membership.id,
+                    tokenHash,
+                    user.email,
+                    expiresAt,
+                );
+
+                return updatedMembership;
+            })
+        } else {
+            throw new AppError(
+                "Unable to invite member.",
+                400,
+            )
+        }
 
         const invitationUrl = 
             `${APP_URL}/accept-invitation?token=${invitationToken}`;
 
         const inviter = await this.userRepo.findById(inviterUserId);
 
+        if (!inviter) {
+            throw new AppError(
+                "Inviter not found",
+                404,
+            );
+        }
+
         await emailQueue.add("membership-invitation", {
             type: "membership-invitation",
             to: user.email,
             data: {
-                inviterName: inviter!.name,
+                inviterName: inviter.name,
                 organizationName: organization.name,
                 invitationUrl,
                 role: data.role,
@@ -159,6 +232,142 @@ export class MembershipService {
         return toInviteMemberResponse(
             createdMembership,
             user.email,
+        );
+    }
+
+    async acceptInvitation(
+        data: AcceptInvitationDTO,
+    ) {
+        const tokenHash = hashToken(data.token);
+
+        const invitation = 
+            await this.membershipInvitationRepo.findByTokenHash(
+                tokenHash,
+            );
+
+        if (!invitation) {
+            throw new AppError(
+                "Invalid invitation token.",
+                404, 
+            );
+        }
+
+        if (invitation.usedAt) {
+            throw new AppError(
+                "Invitation has already been used.",
+                409,
+            );
+        }
+
+        if (invitation.expiresAt < new Date()) {
+            throw new AppError(
+                "Invitation has expired.",
+                410,
+            );
+        }
+
+        if (invitation.membership.status === MembershipStatus.ACTIVE) {
+            throw new AppError(
+                "Membership is already active.",
+                409,
+            );
+        }
+
+        if (invitation.membership.status === MembershipStatus.REJECTED) {
+            throw new AppError(
+                "Invitation has already been rejected.",
+                409,
+            );
+        }
+
+        if (invitation.membership.status === MembershipStatus.SUSPENDED) {
+            throw new AppError(
+                "Membership has been suspended.",
+                403,
+            );
+        }
+
+        const membership = await prisma.$transaction(async (tx) => {
+            const membershipRepo = new MembershipRepository(tx);
+            const invitationRepo = new MembershipInvitationRepository(tx);
+
+            const updatedMembership = await membershipRepo.activateInvitation(
+                invitation.membership.id,
+            );
+
+            await invitationRepo.markAsUsed(
+                invitation.id,
+            );
+
+            return updatedMembership;
+        });
+
+        return toAcceptInvitationResponse(
+            membership,
+        )
+    }
+
+    async rejectInvitation(
+        data: RejectInvitationDTO,
+    ) {
+        const tokenHash = hashToken(data.token);
+
+        const invitation = await this.membershipInvitationRepo.findByTokenHash(
+            tokenHash,
+        );
+
+        if (!invitation) {
+            throw new AppError(
+                "Invalid invitation token.",
+                404,
+            );
+        }
+
+        if (invitation.usedAt) {
+            throw new AppError(
+                "Invitation has already been processed.",
+                409,
+            );
+        }
+
+        if (invitation.expiresAt < new Date()) {
+            throw new AppError(
+                "Invitation has expired.",
+                410,
+            );
+        }
+
+        if (invitation.membership.status === MembershipStatus.ACTIVE) {
+            throw new AppError(
+                "Membership is already active",
+                409,
+            )
+        }
+
+        if (invitation.membership.status === MembershipStatus.REJECTED) {
+            throw new AppError(
+                "Invitation has already been rejected.",
+                409,
+            );
+        }
+
+        const membership = await prisma.$transaction(async (tx) => {
+            const membershipRepo = new MembershipRepository(tx);
+            const invitationRepo = new MembershipInvitationRepository(tx);
+
+            const updatedMembership = await membershipRepo.rejectInvitation(
+                invitation.membership.id,
+            );
+
+            await invitationRepo.markAsUsed(
+                invitation.id,
+            );
+
+            return updatedMembership;
+        })
+
+        return toRejectInvitationResponse(
+            membership,
         );
     }
 }

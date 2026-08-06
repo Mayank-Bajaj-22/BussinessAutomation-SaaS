@@ -85,17 +85,6 @@ export class MembershipRepository implements IMembershipRepository {
         });
     }
 
-    async activate(membershipId: string): Promise<Membership> {
-        return this.db.membership.update({
-            where: {
-                id: membershipId,
-            },
-            data: {
-                status: "ACTIVE",
-            },
-        });
-    }
-
     async findActiveMembershipWithOrganization(
         userId: string, 
         organizationId?: string
@@ -125,6 +114,54 @@ export class MembershipRepository implements IMembershipRepository {
             include: {
                 user: true,
                 organization: true,
+            },
+        });
+    }
+
+    async activateInvitation(
+        membershipId: string
+    ): Promise<Membership> {
+        return this.db.membership.update({
+            where: {
+                id: membershipId,
+            },
+            data: {
+                status: MembershipStatus.ACTIVE,
+                joinedAt: new Date(),
+            },
+        });
+    }
+
+    async rejectInvitation(
+        membershipId: string
+    ): Promise<Membership> {
+        return this.db.membership.update({
+            where: {
+                id: membershipId,
+            },
+            data: {
+                status: MembershipStatus.REJECTED,
+            },
+        });
+    }
+
+    async reInvite(
+        membershipId: string, 
+        role: MembershipRole, 
+        invitedById: string
+    ): Promise<Membership> {
+        return this.db.membership.update({
+            where: {
+                id: membershipId,
+            },
+            data: {
+                role,
+                status: MembershipStatus.INVITED,
+                invitedBy: {
+                    connect: {
+                        id: invitedById,
+                    },
+                },
             },
         });
     }

@@ -27,6 +27,7 @@ enum MembershipStatus {
   INVITED
   ACTIVE
   SUSPENDED
+  REJECTED
 }
 
 enum Currency {
@@ -214,7 +215,7 @@ model MembershipInvitationToken {
 
   tokenHash         String            @unique
 
-  membershipId      String
+  membershipId      String            @unique
   invitedEmail      String
 
   expiresAt         DateTime

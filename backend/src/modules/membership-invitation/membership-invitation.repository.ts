@@ -1,4 +1,4 @@
-import { MembershipInvitationToken, Prisma, PrismaClient } from "@prisma/client";
+import { Membership, MembershipInvitationToken, Organization, Prisma, PrismaClient, User } from "@prisma/client";
 import { IMembershipInvitationRepository } from "./membership-invitation.repository.interface.js";
 import { prisma } from "../../lib/prisma.js";
 
@@ -20,23 +20,33 @@ export class MembershipInvitationRepository implements IMembershipInvitationRepo
     async findByMembershipId(
         membershipId: string
     ): Promise<MembershipInvitationToken | null> {
-        return this.db.membershipInvitationToken.findFirst({
+        return this.db.membershipInvitationToken.findUnique({
             where: {
                 membershipId,
-                usedAt: null,
-            },
-            orderBy: {
-                createdAt: "asc",
             },
         });
     }
 
     async findByTokenHash(
         tokenHash: string
-    ): Promise<MembershipInvitationToken | null> {
+    ): Promise<MembershipInvitationToken & {
+        membership: Membership & {
+            user: User,
+            organization: Organization,
+        },
+    } | null> {
         return this.db.membershipInvitationToken.findUnique({
             where: {
                 tokenHash,
+                usedAt: null,
+            },
+            include: {
+                membership: {
+                    include: {
+                        user: true,
+                        organization: true,
+                    },
+                },
             },
         });
     }
@@ -50,6 +60,25 @@ export class MembershipInvitationRepository implements IMembershipInvitationRepo
             },
             data: {
                 usedAt: new Date(),
+            },
+        });
+    }
+
+    async refreshInvitation(
+        membershipId: string, 
+        tokenHash: string, 
+        invitedEmail: string,
+        expiresAt: Date
+    ): Promise<MembershipInvitationToken> {
+        return this.db.membershipInvitationToken.update({
+            where: {
+                membershipId,
+            },
+            data: {
+                tokenHash,
+                expiresAt,
+                invitedEmail,
+                usedAt: null,
             },
         });
     }

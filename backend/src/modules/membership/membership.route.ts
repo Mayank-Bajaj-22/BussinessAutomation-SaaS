@@ -4,8 +4,8 @@ import { organizationMiddleware } from "../../common/middlewares/organization.mi
 import { authorize } from "../../common/middlewares/authorize.middleware.js";
 import { MembershipRole } from "@prisma/client";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { inviteMemberSchema } from "./membership.schema.js";
-import { memberInviteController } from "./membership.controller.js";
+import { acceptInvitationSchema, inviteMemberSchema } from "./membership.schema.js";
+import { acceptInvitationController, memberInviteController } from "./membership.controller.js";
 
 const router = express.Router();
 
@@ -17,6 +17,13 @@ router
         authorize(MembershipRole.OWNER, MembershipRole.ADMIN), 
         validate(inviteMemberSchema),
         memberInviteController,
+    );
+
+router
+    .route("/organizations/invitations/accept")
+    .post(
+        validate(acceptInvitationSchema), 
+        acceptInvitationController,
     );
 
 export default router;

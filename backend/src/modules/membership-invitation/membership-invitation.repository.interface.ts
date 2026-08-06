@@ -1,4 +1,4 @@
-import { MembershipInvitationToken, Prisma } from "@prisma/client";
+import { Membership, MembershipInvitationToken, Organization, Prisma, User } from "@prisma/client";
 
 export interface IMembershipInvitationRepository {
     create(
@@ -11,9 +11,21 @@ export interface IMembershipInvitationRepository {
 
     findByTokenHash(
         tokenHash: string,
-    ) : Promise<MembershipInvitationToken | null>;
+    ) : Promise<MembershipInvitationToken & {
+        membership: Membership & {
+            user: User,
+            organization: Organization,
+        },
+    } | null>;
 
     markAsUsed(
         tokenId: string,
+    ) : Promise<MembershipInvitationToken>;
+
+    refreshInvitation(
+        membershipId: string,
+        tokenHash: string,
+        invitedEmail: string,
+        expiresAt: Date,
     ) : Promise<MembershipInvitationToken>;
 }

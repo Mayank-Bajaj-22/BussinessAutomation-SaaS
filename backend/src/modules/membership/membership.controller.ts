@@ -18,3 +18,17 @@ export const memberInviteController = CatchAsync(
         });
     }
 );
+
+export const acceptInvitationController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const result = await membershipService.acceptInvitation(
+            req.body,
+        );
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Invitation accepted successfully.",
+            data: result,
+        });
+    }
+);

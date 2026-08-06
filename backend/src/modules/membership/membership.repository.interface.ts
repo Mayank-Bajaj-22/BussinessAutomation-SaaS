@@ -37,10 +37,6 @@ export interface IMembershipRepository {
         membershipId: string,
     ) : Promise<Membership>;
 
-    activate(
-        membershipId: string,
-    ) : Promise<Membership>;
-
     findActiveMembershipWithOrganization(
         userId: string,
         organizationId?: string,
@@ -52,4 +48,18 @@ export interface IMembershipRepository {
             }
         ) | null
     >;
+
+    activateInvitation(
+        membershipId: string,
+    ) : Promise<Membership>;
+
+    rejectInvitation(
+        membershipId: string,
+    ) : Promise<Membership>;
+
+    reInvite(
+        membershipId: string,
+        role: MembershipRole,
+        invitedById: string,
+    ) : Promise<Membership>;    
 }

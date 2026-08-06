@@ -1,5 +1,5 @@
 import { Membership } from "@prisma/client";
-import { InviteMemberResponse } from "./membership.response.js";
+import { AcceptInvitationResponse, InviteMemberResponse, RejectInvitationResponse } from "./membership.response.js";
 
 export const toInviteMemberResponse = (
     membership: Membership,
@@ -11,5 +11,29 @@ export const toInviteMemberResponse = (
         role: membership.role,
         status: membership.status,
         invitedAt: membership.createdAt,
+    }
+}
+
+export const toAcceptInvitationResponse = (
+    membership: Membership,
+) : AcceptInvitationResponse => {
+    return {
+        membershipId: membership.id,
+        organizationId: membership.organizationId,
+        role: membership.role,
+        status: membership.status,
+        joinedAt: membership.joinedAt,
+    }
+}
+
+export const toRejectInvitationResponse = (
+    membership: Membership,
+) : RejectInvitationResponse => {
+    return {
+        membershipId: membership.id,
+        organizationId: membership.organizationId,
+        role: membership.role,
+        status: membership.status,
+        joinedAt: membership.joinedAt,
     }
 }
