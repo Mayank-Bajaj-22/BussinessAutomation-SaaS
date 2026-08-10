@@ -55,17 +55,6 @@ export class MembershipRepository implements IMembershipRepository {
         });
     }
 
-    async changeRole(membershipId: string, role: MembershipRole): Promise<Membership> {
-        return this.db.membership.update({
-            where: {
-                id: membershipId,
-            },
-            data: {
-                role,
-            },
-        });
-    }
-
     async remove(membershipId: string): Promise<Membership> {
         return this.db.membership.delete({
             where: {
@@ -74,13 +63,22 @@ export class MembershipRepository implements IMembershipRepository {
         });
     }
 
-    async suspend(membershipId: string): Promise<Membership> {
+    async suspend(
+        membershipId: string,
+    ): Promise<
+        Membership & {
+            user: User;
+        }
+    > {
         return this.db.membership.update({
             where: {
                 id: membershipId,
             },
             data: {
                 status: "SUSPENDED",
+            },
+            include: {
+                user: true,
             },
         });
     }
@@ -118,9 +116,33 @@ export class MembershipRepository implements IMembershipRepository {
         });
     }
 
+    async activate(
+        membershipId: string
+    ): Promise<
+        Membership & {
+            user: User;
+        }
+    > {
+        return this.db.membership.update({
+            where: {
+                id: membershipId,
+            },
+            data: {
+                status: MembershipStatus.ACTIVE,
+            },
+            include: {
+                user: true,
+            },
+        });
+    }
+
     async activateInvitation(
         membershipId: string
-    ): Promise<Membership> {
+    ): Promise<
+        Membership & {
+            user: User;
+        }
+    > {
         return this.db.membership.update({
             where: {
                 id: membershipId,
@@ -128,6 +150,9 @@ export class MembershipRepository implements IMembershipRepository {
             data: {
                 status: MembershipStatus.ACTIVE,
                 joinedAt: new Date(),
+            },
+            include: {
+                user: true,
             },
         });
     }
@@ -163,6 +188,65 @@ export class MembershipRepository implements IMembershipRepository {
                     },
                 },
             },
+        });
+    }
+
+    async findManyWithUsersByOrganization(
+        organizationId: string
+    ): Promise<(Membership & { user: User; })[]> {
+        return this.db.membership.findMany({
+            where: {
+                organizationId,
+            },
+            include: {
+                user: true,
+            },
+            orderBy: {
+                createdAt: "desc",
+            }
+        })
+    }
+
+    async findMemberWithUser(
+        membershipId: string
+    ): Promise<(Membership & { user: User; }) | null> {
+        return this.db.membership.findUnique({
+            where: {
+                id: membershipId,
+            },
+            include: {
+                user: true,
+            },
+        });
+    }
+
+    async changeMemberRole(
+        membershipId: string, 
+        role: MembershipRole
+    ): Promise<Membership & { user: User; }> {
+        return this.db.membership.update({
+            where: {
+                id: membershipId,
+            },
+            data: {
+                role,
+            },
+            include: {
+                user: true,
+            },
+        });
+    }
+
+    async cancelInvitation(
+        membershipId: string
+    ): Promise<Membership> {
+        return this.db.membership.update({
+            where: {
+                id: membershipId,
+            },
+            data: {
+                status: MembershipStatus.REJECTED,
+            }
         });
     }
 }

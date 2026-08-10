@@ -1,6 +1,6 @@
-import { Membership, MembershipStatus, Organization, OrganizationStatus, UserStatus } from "@prisma/client";
+import { Membership, MembershipRole, MembershipStatus, Organization, OrganizationStatus, UserStatus } from "@prisma/client";
 import { IMembershipRepository } from "./membership.repository.interface.js";
-import { AcceptInvitationDTO, InviteMemberDto, RejectInvitationDTO } from "./membership.schema.js";
+import { AcceptInvitationDTO, ChangeMemberRoleDTO, InviteMemberDto, RejectInvitationDTO } from "./membership.schema.js";
 import { IMembershipInvitationRepository } from "../membership-invitation/membership-invitation.repository.interface.js";
 import { IUserRepository } from "../user/user.repository.interface.js";
 import { AppError } from "../../common/errors/AppError.js";
@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { hashToken } from "../../lib/bcrypt.js";
 import { APP_URL } from "../../config/env.config.js";
 import { emailQueue } from "../../jobs/queues/email.queue.js";
-import { toAcceptInvitationResponse, toInviteMemberResponse, toRejectInvitationResponse } from "./membership.mapper.js";
+import { toAcceptInvitationResponse, toActivateMemberResponse, toCancelInvitationResponse, toChangeMemberRoleResponse, toInviteMemberResponse, toMemberResponse, toMembersResponse, toRejectInvitationResponse, toRemoveMemberResponse, toSuspendResponse } from "./membership.mapper.js";
 
 export class MembershipService {
     constructor(
@@ -291,7 +291,7 @@ export class MembershipService {
             const membershipRepo = new MembershipRepository(tx);
             const invitationRepo = new MembershipInvitationRepository(tx);
 
-            const updatedMembership = await membershipRepo.activateInvitation(
+            const updatedMembership = await membershipRepo.activate(
                 invitation.membership.id,
             );
 
@@ -368,6 +368,580 @@ export class MembershipService {
 
         return toRejectInvitationResponse(
             membership,
+        );
+    }
+
+    async getAllMembers(
+        organization: Organization,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const memberships = await this.membershipRepo.findManyWithUsersByOrganization(
+            organization.id,
+        );
+
+        return toMembersResponse(
+            memberships,
+        );
+    }
+
+    async getMemberById(
+        organization: Organization,
+        membershipId: string,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const membership = await this.membershipRepo.findMemberWithUser(
+            membershipId,
+        );
+
+        if (!membership) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (membership.organizationId !== organization.id) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        return toMemberResponse(
+            membership,
+        );
+    }
+
+    async changeMemberRole(
+        data: ChangeMemberRoleDTO,
+        currentMembershipId: string,
+        organization: Organization,
+        targetMembershipId: string,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const targetMembership = await this.membershipRepo.findMemberWithUser(
+            targetMembershipId,
+        );
+
+        if (!targetMembership) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (
+            targetMembership.organizationId !==
+            organization.id
+        ) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.id === currentMembershipId) {
+            throw new AppError(
+                "You cannot change your own role.",
+                409,
+            );
+        }
+
+        if (targetMembership.role === MembershipRole.OWNER) {
+            throw new AppError(
+                "Owner role cannot be changed.",
+                403,
+            );
+        }
+
+        if (targetMembership.role === data.role) {
+            throw new AppError(
+                `Member is already ${data.role}.`,
+                403,
+            );
+        }
+
+        const currentMembership = await this.membershipRepo.findById(
+            currentMembershipId,
+        );
+
+        if (!currentMembership) {
+            throw new AppError(
+                "Current membership not found.",
+                404,
+            );
+        }
+
+        if (currentMembership.role === MembershipRole.ADMIN) {
+            if (targetMembership.role === MembershipRole.ADMIN) {
+                throw new AppError(
+                    "Admin cannot modify another Admin.",
+                    403,
+                );
+            }
+        }
+
+        const updatedMembership = await this.membershipRepo.changeMemberRole(
+            targetMembership.id,
+            data.role,
+        );
+
+        return toChangeMemberRoleResponse(
+            updatedMembership,
+        );
+    }
+
+    async suspendMember(
+        currentMembershipId: string,
+        organization: Organization,
+        targetMembershipId: string,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const targetMembership = 
+            await this.membershipRepo.findMemberWithUser(targetMembershipId);
+
+        if (!targetMembership) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.organizationId !== organization.id) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.id === currentMembershipId) {
+            throw new AppError(
+                "You cannot suspend yourself.",
+                409,
+            );
+        }
+
+        if (targetMembership.role === MembershipRole.OWNER) {
+            throw new AppError(
+                "Owner cannot be suspended.",
+                403,
+            );
+        }
+
+        if (targetMembership.status === MembershipStatus.INVITED) {
+            throw new AppError(
+                "Invited members cannot be suspended. Reject or cancel the invitation instead.",
+                409,
+            );
+        }
+
+        if (targetMembership.status === MembershipStatus.SUSPENDED) {
+            throw new AppError(
+                "Member is already suspended.",
+                409,
+            );
+        }
+
+        const currentMembership = 
+            await this.membershipRepo.findById(currentMembershipId);
+
+        if (!currentMembership) {
+            throw new AppError(
+                "Current membership not found.",
+                404,
+            );
+        }
+
+        if (currentMembership.role === MembershipRole.ADMIN) {
+            if (targetMembership.role === MembershipRole.ADMIN) {
+                throw new AppError(
+                    "Admin cannot suspend another Admin.",
+                    403,
+                );
+            }
+        }
+
+        const suspendMembership = 
+            await this.membershipRepo.suspend(
+                targetMembership.id,
+            );
+
+        return toSuspendResponse(
+            suspendMembership,
+        );
+    }
+
+    async activateMember(
+        currentMembershipId: string,
+        organization: Organization,
+        targetMembershipId: string,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const targetMembership =
+            await this.membershipRepo.findMemberWithUser(
+                targetMembershipId,
+            );
+
+        if (!targetMembership) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.id !== organization.id) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.id === currentMembershipId) {
+            throw new AppError(
+                "You cannot activate yourself.",
+                409,
+            );
+        }
+
+        if (targetMembership.role === MembershipRole.OWNER) {
+            throw new AppError(
+                "Owner is already active.",
+                409,
+            );
+        }
+
+        if (targetMembership.status === MembershipStatus.ACTIVE) {
+            throw new AppError(
+                "Member is already active.",
+                409,
+            );
+        }
+
+        if (targetMembership.status === MembershipStatus.INVITED) {
+            throw new AppError(
+                "Invited members cannot be activated. Accept the invitation first.",
+                409,
+            );
+        }
+
+        if (targetMembership.status === MembershipStatus.REJECTED) {
+            throw new AppError(
+                "Rejected members cannot be activated. Re-invite the member first.",
+                409,
+            );
+        }
+
+        const currentMembership =
+            await this.membershipRepo.findById(
+                currentMembershipId,
+            );
+
+        if (!currentMembership) {
+            throw new AppError(
+                "Current membership not found.",
+                404,
+            );
+        }
+
+        if (currentMembership.role === MembershipRole.ADMIN) {
+            if (
+                targetMembership.role ===
+                MembershipRole.ADMIN
+            ) {
+                throw new AppError(
+                    "Admin cannot activate another Admin.",
+                    403,
+                );
+            }
+        }
+
+        const activatemembership = 
+            await this.membershipRepo.activateInvitation(
+                targetMembership.id,
+            );
+
+        return toActivateMemberResponse(
+            activatemembership,
+        );
+    }
+
+    async removeMember(
+        currentMembershipId: string,
+        organization: Organization,
+        targetMembershipId: string,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const targetMembership =
+            await this.membershipRepo.findMemberWithUser(
+                targetMembershipId,
+            );
+
+        if (!targetMembership) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.id !== organization.id) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.id === currentMembershipId) {
+            throw new AppError(
+                "You cannot remove yourself from the organization.",
+                409,
+            );
+        }
+
+        if (targetMembership.role === MembershipRole.OWNER) {
+            throw new AppError(
+                "Owner cannot be removed.",
+                403,
+            );
+        }
+
+        if (targetMembership.status === MembershipStatus.INVITED) {
+            throw new AppError(
+                "Pending invitations cannot be removed. Cancel the invitation instead.",
+                409,
+            );
+        }
+
+        const currentMembership =
+            await this.membershipRepo.findById(
+                currentMembershipId,
+            );
+
+        if (!currentMembership) {
+            throw new AppError(
+                "Current membership not found.",
+                404,
+            );
+        }
+
+        if (currentMembership.role === MembershipRole.ADMIN) {
+            if (targetMembership.role === MembershipRole.ADMIN) {
+                throw new AppError(
+                    "Admin cannot remove another Admin.",
+                    403,
+                );
+            }
+        }
+
+        const removedMembership =
+            await this.membershipRepo.remove(
+                targetMembership.id,
+            );
+
+        return toRemoveMemberResponse(
+            removedMembership,
+        );
+    }
+
+    async cancelInvitation(
+        currentMembershipId: string,
+        organization: Organization,
+        targetMembershipId: string,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const targetMembership =
+            await this.membershipRepo.findMemberWithUser(
+                targetMembershipId,
+            );
+
+        if (!targetMembership) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.organizationId !== organization.id) {
+            throw new AppError(
+                "Member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.id === currentMembershipId) {
+            throw new AppError(
+                "You cannot cancel your own invitation.",
+                409,
+            );
+        }
+
+        const currentMembership = 
+            await this.membershipRepo.cancelInvitation(
+                currentMembershipId,
+            );
+
+        if (!currentMembership) {
+            throw new AppError(
+                "Current membership not found.",
+                404,
+            );
+        }
+
+        if (
+            currentMembership.role !== MembershipRole.OWNER &&
+            currentMembership.role !== MembershipRole.ADMIN
+        ) {
+            throw new AppError(
+                "You don't have permission to cancel invitations.",
+                403,
+            );
+        }
+
+        if (
+            currentMembership.role === MembershipRole.ADMIN &&
+            targetMembership.role === MembershipRole.ADMIN
+        ) {
+            throw new AppError(
+                "Admin cannot cancel another Admin's invitation.",
+                403,
+            );
+        }
+
+        if (targetMembership.status !== MembershipStatus.INVITED) {
+            throw new AppError(
+                "This member does not have a pending invitation.",
+                409,
+            );
+        }
+
+        const invitation =
+            await this.membershipInvitationRepo.findByMembershipId(
+                targetMembership.id,
+            );
+
+        if (!invitation) {
+            throw new AppError(
+                "Invitation token not found.",
+                404,
+            );
+        }
+
+        if (invitation.usedAt) {
+            throw new AppError(
+                "Invitation has already been processed.",
+                409,
+            );
+        }
+
+        const cancelledMembership = 
+            await prisma.$transaction(async (tx) => {
+                const membershipRepo = new MembershipRepository(tx);
+                const invitationRepo = new MembershipInvitationRepository(tx);
+
+                const updatedMembership = 
+                    await membershipRepo.cancelInvitation(
+                        targetMembership.id,
+                    );
+
+                await invitationRepo.markAsUsed(
+                    invitation.id,
+                );
+
+                return updatedMembership;
+            });
+
+        return toCancelInvitationResponse(
+            cancelledMembership,
         );
     }
 }

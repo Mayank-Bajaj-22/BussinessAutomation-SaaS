@@ -24,18 +24,17 @@ export interface IMembershipRepository {
         data: Prisma.MembershipUpdateInput,
     ) : Promise<Membership>;
 
-    changeRole(
-        membershipId: string,
-        role: MembershipRole,
-    ) : Promise<Membership>;
-
     remove(
         membershipId: string,
     ) : Promise<Membership>;
 
     suspend(
         membershipId: string,
-    ) : Promise<Membership>;
+    ) : Promise<
+        Membership & {
+            user: User,
+        }
+    >;
 
     findActiveMembershipWithOrganization(
         userId: string,
@@ -49,9 +48,21 @@ export interface IMembershipRepository {
         ) | null
     >;
 
+    activate(
+        membershipId: string,
+    ) : Promise<
+        Membership & {
+            user: User;
+        }
+    >;
+
     activateInvitation(
         membershipId: string,
-    ) : Promise<Membership>;
+    ) : Promise<
+        Membership & {
+            user: User;
+        }
+    >;
 
     rejectInvitation(
         membershipId: string,
@@ -61,5 +72,50 @@ export interface IMembershipRepository {
         membershipId: string,
         role: MembershipRole,
         invitedById: string,
-    ) : Promise<Membership>;    
+    ) : Promise<Membership>;
+
+    findManyWithUsersByOrganization(
+        organizationId: string,
+    ) : Promise<
+        (
+            Membership & {
+                user: User;
+            }
+        )[]
+    >;
+
+    findMemberWithUser(
+        membershipId: string,
+    ) : Promise<
+        (
+            Membership & {
+                user: User,
+            }
+        ) | null
+    >;
+
+    changeMemberRole(
+        membershipId: string,
+        role: MembershipRole,
+    ) : Promise<
+        Membership & {
+            user: User,
+        }
+    >;
+
+    cancelInvitation(
+        membershipId: string,
+    ) : Promise<Membership>;
+
+    transferOwnership(
+        currentOwnerMembershipId: string,
+        targetMembershipId: string,
+    ) : Promise<{
+        currentOwner: Membership & {
+            user: User,
+        };
+        newOwner: Membership & {
+            user: User,
+        };
+    }>
 }
