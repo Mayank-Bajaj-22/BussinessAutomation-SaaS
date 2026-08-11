@@ -4,8 +4,8 @@ import { organizationMiddleware } from "../../common/middlewares/organization.mi
 import { authorize } from "../../common/middlewares/authorize.middleware.js";
 import { MembershipRole } from "@prisma/client";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { acceptInvitationSchema, changeMemberRoleSchema, inviteMemberSchema } from "./membership.schema.js";
-import { acceptInvitationController, activateMemberController, cancelInvitationController, changeMemberRoleController, getMembersByIdController, getMembersController, memberInviteController, rejectInvitationController, removeMemberController, suspendMemberController } from "./membership.controller.js";
+import { acceptInvitationSchema, changeMemberRoleSchema, inviteMemberSchema, transferOwnershipSchema } from "./membership.schema.js";
+import { acceptInvitationController, activateMemberController, cancelInvitationController, changeMemberRoleController, getMembersByIdController, getMembersController, leaveOrganizationController, memberInviteController, rejectInvitationController, removeMemberController, suspendMemberController, transferOwnershipController } from "./membership.controller.js";
 
 const router = express.Router();
 
@@ -116,6 +116,24 @@ router
             MembershipRole.ADMIN,
         ),
         cancelInvitationController,
+    );
+
+router
+    .route("/organizations/current/transfer-ownership")
+    .post(
+        authMiddleware, 
+        organizationMiddleware,
+        authorize(MembershipRole.OWNER),
+        validate(transferOwnershipSchema),
+        transferOwnershipController,
+    );
+
+router
+    .route("/organizations/current/membership")
+    .delete(
+        authMiddleware,
+        organizationMiddleware,
+        leaveOrganizationController,
     );
 
 export default router;

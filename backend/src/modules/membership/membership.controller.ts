@@ -158,3 +158,35 @@ export const cancelInvitationController = CatchAsync(
         });
     }
 );
+
+export const transferOwnershipController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const result = await membershipService.tranferOwnership(
+            req.membership!.id,
+            req.organization!,
+            req.body,
+        );
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "Ownership transferred successfully.",
+            data: result,
+        });
+    }
+);
+
+export const leaveOrganizationController = CatchAsync(
+    async (req: Request, res: Response) => {
+        const result =
+            await membershipService.LeaveOrganization(
+                req.membership!.id,
+                req.organization!,
+            );
+
+        sendResponse(res, 200, {
+            success: true,
+            message: "You left the organization successfully.",
+            data: result,
+        });
+    }
+);

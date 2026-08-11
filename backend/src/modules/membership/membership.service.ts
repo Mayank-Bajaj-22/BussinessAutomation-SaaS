@@ -1,6 +1,6 @@
 import { Membership, MembershipRole, MembershipStatus, Organization, OrganizationStatus, UserStatus } from "@prisma/client";
 import { IMembershipRepository } from "./membership.repository.interface.js";
-import { AcceptInvitationDTO, ChangeMemberRoleDTO, InviteMemberDto, RejectInvitationDTO } from "./membership.schema.js";
+import { AcceptInvitationDTO, ChangeMemberRoleDTO, InviteMemberDto, RejectInvitationDTO, TransferOwnershipDTO } from "./membership.schema.js";
 import { IMembershipInvitationRepository } from "../membership-invitation/membership-invitation.repository.interface.js";
 import { IUserRepository } from "../user/user.repository.interface.js";
 import { AppError } from "../../common/errors/AppError.js";
@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { hashToken } from "../../lib/bcrypt.js";
 import { APP_URL } from "../../config/env.config.js";
 import { emailQueue } from "../../jobs/queues/email.queue.js";
-import { toAcceptInvitationResponse, toActivateMemberResponse, toCancelInvitationResponse, toChangeMemberRoleResponse, toInviteMemberResponse, toMemberResponse, toMembersResponse, toRejectInvitationResponse, toRemoveMemberResponse, toSuspendResponse } from "./membership.mapper.js";
+import { toAcceptInvitationResponse, toActivateMemberResponse, toCancelInvitationResponse, toChangeMemberRoleResponse, toInviteMemberResponse, toLeaveOrganizationResponse, toMemberResponse, toMembersResponse, toRejectInvitationResponse, toRemoveMemberResponse, toSuspendResponse, toTransferOwnershipResponse } from "./membership.mapper.js";
 
 export class MembershipService {
     constructor(
@@ -942,6 +942,170 @@ export class MembershipService {
 
         return toCancelInvitationResponse(
             cancelledMembership,
+        );
+    }
+
+    async tranferOwnership(
+        currentMembershipId: string,
+        organization: Organization,
+        data: TransferOwnershipDTO,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const currentMembership =
+            await this.membershipRepo.findMemberWithUser(
+                currentMembershipId,
+            );
+
+        if (!currentMembership) {
+            throw new AppError(
+                "Current membership not found.",
+                404,
+            );
+        }
+
+        if (currentMembership.role !== MembershipRole.OWNER) {
+            throw new AppError(
+                "Only the owner can transfer ownership.",
+                403,
+            );
+        }
+
+        if (currentMembership.id === data.membershipId) {
+            throw new AppError(
+                "You cannot transfer ownership to yourself.",
+                409,
+            );
+        }
+
+        const targetMembership = 
+            await this.membershipRepo.findMemberWithUser(
+                data.membershipId,
+            );
+
+        if (!targetMembership) {
+            throw new AppError(
+                "Target member not found.",
+                404,
+            );
+        }
+
+        if (targetMembership.organizationId !== organization.id) {
+            throw new AppError(
+                "Target member does not belong to this organization.",
+                404,
+            );
+        }
+
+        if (targetMembership.status !== MembershipStatus.ACTIVE) {
+            throw new AppError(
+                "Ownership can only be transferred to an active member.",
+                409,
+            );
+        }
+
+        if (targetMembership.role === MembershipRole.OWNER) {
+            throw new AppError(
+                "Target member is already the owner.",
+                409,
+            );
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            const membershipRepo = new MembershipRepository(tx);
+
+            const previousOwner = await membershipRepo.updateRoleWithUser(
+                currentMembership.id,
+                MembershipRole.ADMIN,
+            );
+
+            const newOwner = await membershipRepo.updateRoleWithUser(
+                targetMembership.id,
+                MembershipRole.OWNER,
+            );
+
+            return {
+                previousOwner,
+                newOwner,
+            };
+        })
+
+        return toTransferOwnershipResponse(
+            result.previousOwner,
+            result.newOwner,
+        );
+    }
+
+    async LeaveOrganization(
+        currentMembershipId: string,
+        organization: Organization,
+    ) {
+        if (organization.deletedAt) {
+            throw new AppError(
+                "Organization has been deleted.",
+                400,
+            );
+        }
+
+        if (organization.status !== OrganizationStatus.ACTIVE) {
+            throw new AppError(
+                "Organization is inactive.",
+                400,
+            );
+        }
+
+        const currentMembership =
+            await this.membershipRepo.findById(
+                currentMembershipId,
+            );
+
+        if (!currentMembership) {
+            throw new AppError(
+                "Current membership not found.",
+                404,
+            );
+        }
+
+        if (currentMembership.organizationId !== organization.id) {
+            throw new AppError(
+                "Membership not found.",
+                404,
+            );
+        }
+
+        if (currentMembership.status !== MembershipStatus.ACTIVE) {
+            throw new AppError(
+                "Only active members can leave the organization.",
+                409,
+            );
+        }
+
+        if (currentMembership.role === MembershipRole.OWNER) {
+            throw new AppError(
+                "Owner cannot leave the organization. Transfer ownership first.",
+                409,
+            );
+        }
+
+        const removedMembership =
+            await this.membershipRepo.remove(
+                currentMembership.id,
+            );
+
+        return toLeaveOrganizationResponse(
+            removedMembership,
         );
     }
 }

@@ -1,5 +1,5 @@
-import { Membership, User } from "@prisma/client";
-import { AcceptInvitationResponse, ActivateMemberResponse, CancelInvitationResponse, ChangeMemberRoleResponse, InviteMemberResponse, MemberResponse, MembersResponse, RejectInvitationResponse, RemoveMemberResponse, SuspendMemberResponse } from "./membership.response.js";
+import { Membership, MembershipRole, User } from "@prisma/client";
+import { AcceptInvitationResponse, ActivateMemberResponse, CancelInvitationResponse, ChangeMemberRoleResponse, InviteMemberResponse, LeaveOrganizationResponse, MemberResponse, MembersResponse, RejectInvitationResponse, RemoveMemberResponse, SuspendMemberResponse, TransferOwnershipResponse } from "./membership.response.js";
 
 export const toInviteMemberResponse = (
     membership: Membership,
@@ -148,5 +148,37 @@ export const toCancelInvitationResponse = (
     return {
         membershipId: membership.id,
         cancelled: true,
+    }
+}
+
+export const toTransferOwnershipResponse = (
+    previousOwner: Membership & { user: User },
+    newOwner: Membership & { user: User },
+) : TransferOwnershipResponse => {
+    return {
+        previousOwner: {
+            membershipId: previousOwner.id,
+            userId: previousOwner.user.id,
+            name: previousOwner.user.name,
+            email: previousOwner.user.email,
+            role: previousOwner.role,
+        },
+        newOwner: {
+            membershipId: newOwner.id,
+            userId: newOwner.user.id,
+            name: newOwner.user.name,
+            email: newOwner.user.email,
+            role: newOwner.role,
+        },
+    }
+}
+
+export const toLeaveOrganizationResponse = (
+    membership: Membership,
+) : LeaveOrganizationResponse => {
+    return {
+        membershipId: membership.id,
+        organizationId: membership.organizationId,
+        left: true,
     }
 }

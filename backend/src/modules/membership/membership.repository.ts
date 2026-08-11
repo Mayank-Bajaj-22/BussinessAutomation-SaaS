@@ -249,4 +249,21 @@ export class MembershipRepository implements IMembershipRepository {
             }
         });
     }
+
+    async updateRoleWithUser(
+        membershipId: string, 
+        role: MembershipRole
+    ): Promise<Membership & { user: User; }> {
+        return this.db.membership.update({
+            where: {
+                id: membershipId,
+            },
+            data: {
+                role,
+            },
+            include: {
+                user: true,
+            },
+        });
+    }
 }

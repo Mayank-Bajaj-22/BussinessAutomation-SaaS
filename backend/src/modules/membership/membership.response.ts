@@ -92,3 +92,27 @@ export interface CancelInvitationResponse {
     membershipId: string;
     cancelled: boolean;
 }
+
+export interface TransferOwnershipResponse {
+    previousOwner: {
+        membershipId: string,
+        userId: string,
+        name: string,
+        email: string,
+        role: string,
+    };
+
+    newOwner: {
+        membershipId: string,
+        userId: string,
+        name: string,
+        email: string,
+        role: string,
+    }
+}
+
+export interface LeaveOrganizationResponse {
+    membershipId: string,
+    organizationId: string,
+    left: boolean,
+}

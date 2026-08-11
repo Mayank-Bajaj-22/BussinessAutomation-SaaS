@@ -107,15 +107,12 @@ export interface IMembershipRepository {
         membershipId: string,
     ) : Promise<Membership>;
 
-    transferOwnership(
-        currentOwnerMembershipId: string,
-        targetMembershipId: string,
-    ) : Promise<{
-        currentOwner: Membership & {
-            user: User,
-        };
-        newOwner: Membership & {
-            user: User,
-        };
-    }>
+    updateRoleWithUser(
+        membershipId: string,
+        role: MembershipRole,
+    ) : Promise<
+        Membership & {
+            user: User;
+        }
+    >;
 }
