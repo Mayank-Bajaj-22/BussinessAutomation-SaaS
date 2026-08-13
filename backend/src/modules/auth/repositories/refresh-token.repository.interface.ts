@@ -46,4 +46,12 @@ export interface IRefreshTokenRepository {
     findBySessionId(
         sessionId: string,
     ): Promise<RefreshToken | null>;
+
+    consumeIfActive(
+        tokenId: string,
+    ) : Promise<boolean>;
+
+    revokeAllBySessionId(
+        sessionId: string,
+    ) : Promise<void>;
 }

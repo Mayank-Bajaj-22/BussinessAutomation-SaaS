@@ -36,7 +36,7 @@ router
 
 router
     .route("/reset-password")
-    .post(authMiddleware, validate(resetPasswordSchema), resetPasswordController);
+    .post(validate(resetPasswordSchema), resetPasswordController);
 
 router
     .route("/change-password")

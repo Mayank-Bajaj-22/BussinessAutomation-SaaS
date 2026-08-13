@@ -175,7 +175,6 @@ export class AuthService {
 
             accessToken,
             refreshToken,
-            verificationToken,
         }
     }
 
@@ -343,22 +342,28 @@ export class AuthService {
 
         const hashedNewRefreshToken = hashRefreshToken(newRefreshToken);
 
-        await prisma.$transaction(async (tx) => {
-            const refreshRepo = 
-                new RefreshTokenRepository(tx);
+        const newRefreshExpiresAt = new Date(
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
+        );
 
-            // revoke old token
-            await refreshRepo.revoke(
-                storedToken.id,
-            );
+        const rotationResult = await prisma.$transaction(async (tx) => {
+            const refreshRepo = new RefreshTokenRepository(tx);
 
-            // save new token
+            const consumed = 
+                await refreshRepo.consumeIfActive(
+                    storedToken.id,
+                );
+
+            if (!consumed) {
+                return {
+                    success: false,
+                };
+            }
+
             await refreshRepo.create({
                 tokenHash: hashedNewRefreshToken,
                 userId: user.id,
-                expiresAt: new Date(
-                    Date.now() + 30 * 24 * 60 * 60 * 1000,
-                ),
+                expiresAt: newRefreshExpiresAt,
                 deviceName: metadata.deviceName,
                 ipAddress: metadata.ipAddress,
                 userAgent: metadata.userAgent,
@@ -366,7 +371,22 @@ export class AuthService {
                 lastUsedAt: new Date(),
                 isCurrent: true,
             });
+
+            return {
+                success: true,
+            };
         });
+
+        if (!rotationResult.success) {
+            await this.refreshTokenRepo.revokeAllBySessionId(
+                storedToken.sessionId,
+            );
+
+            throw new AppError(
+                "Refresh token reuse detected. All sessions have been revoked.",
+                401,
+            );
+        }
 
         await this.userRepo.updateLastLogin(
             user.id,

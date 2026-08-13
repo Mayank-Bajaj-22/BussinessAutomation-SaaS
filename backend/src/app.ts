@@ -6,6 +6,10 @@ import { globalLimiter } from "./common/middlewares/rateLimiter.middleware.js";
 
 export const app = express();
 
+app.use(requestContextMiddleware);
+
+app.use(globalLimiter);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -17,10 +21,8 @@ app.get("/health-check", (req, res) => {
     });
 });
 
-import authRouter from "./modules/auth/auth.routes.js";
+import apiRouter from "./routes/index.js"
 
-app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/", apiRouter);
 
 app.use(globalErrorHandler);
-app.use(requestContextMiddleware);
-app.use(globalLimiter);

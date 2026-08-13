@@ -29,7 +29,7 @@ export const registerUserController = CatchAsync(
 
         sendResponse(res, 201, {
             success: true,
-            message: "Account created successfully.",
+            message: "Account created successfully. Please verify your email.",
             data: result,
         })
     }

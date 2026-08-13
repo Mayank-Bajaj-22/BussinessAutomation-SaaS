@@ -134,4 +134,39 @@ export class RefreshTokenRepository {
             },
         });
     }
+
+    async consumeIfActive(
+        tokenId: string,
+    ) : Promise<boolean> {
+        const result = await this.db.refreshToken.updateMany({
+            where: {
+                id: tokenId,
+                revokedAt: null,
+                expiresAt: {
+                    gt: new Date(),
+                },
+            },
+            data: {
+                revokedAt: new Date(),
+                isCurrent: false,
+            },
+        });
+
+        return result.count === 1;
+    }
+
+    async revokeAllBySessionId(
+        sessionId: string,
+    ) : Promise<void> {
+        await this.db.refreshToken.updateMany({
+            where: {
+                sessionId,
+                revokedAt: null,
+            },
+            data: {
+                revokedAt: new Date(),
+                isCurrent: false,
+            },
+        });
+    }
 }
