@@ -1,11 +1,11 @@
 import jwt, { SignOptions } from "jsonwebtoken";
-import { JWT_ACCESS_TOKEN_EXPIRY, JWT_ACCESS_TOKEN_SECRET, JWT_REFRESH_TOKEN_EXPIRY, JWT_REFRESH_TOKEN_SECRET } from "../config/env.config.js";
+import { env } from "../config/env.config.js";
 import { IJwtPayload } from "../common/types/index.js";
 
-const accessTokenSecret = JWT_ACCESS_TOKEN_SECRET!;
-const accessTokenExpiry = JWT_ACCESS_TOKEN_EXPIRY as SignOptions["expiresIn"];
-const refreshTokenSecret = JWT_REFRESH_TOKEN_SECRET!;
-const refreshTokenExpiry = JWT_REFRESH_TOKEN_EXPIRY as SignOptions["expiresIn"];
+const accessTokenSecret = env.JWT_ACCESS_TOKEN_SECRET!;
+const accessTokenExpiry = env.JWT_ACCESS_TOKEN_EXPIRY as SignOptions["expiresIn"];
+const refreshTokenSecret = env.JWT_REFRESH_TOKEN_SECRET!;
+const refreshTokenExpiry = env.JWT_REFRESH_TOKEN_EXPIRY as SignOptions["expiresIn"];
 
 export const generateAccessToken = (user: IJwtPayload) => {
     return jwt.sign(user, accessTokenSecret, {

@@ -1,8 +1,11 @@
 import { Membership, Organization } from "@prisma/client";
+import { AppLogger } from "../../config/logger.interface.ts";
 
 declare global {
     namespace Express {
         interface Request {
+            requestId: string,
+            logger: AppLogger,
             user?: {
                 requestId?: string;
                 userId?: string;

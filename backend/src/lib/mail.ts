@@ -1,8 +1,8 @@
 import { Resend } from "resend";
-import { MAIL_FROM, RESEND_API_KEY } from "../config/env.config.js";
+import { env } from "../config/env.config.js";
 import { logger } from "../config/logger.js";
 
-const resend = new Resend(RESEND_API_KEY);
+const resend = new Resend(env.RESEND_API_KEY);
 
 export interface SendMailOptions {
     to: string;
@@ -19,7 +19,7 @@ export async function sendMail({
 } : SendMailOptions) : Promise<void> {
     try {
         const { data, error } = await resend.emails.send({
-            from: from ?? MAIL_FROM!,
+            from: from ?? env.MAIL_FROM!,
             to,
             subject,
             html,

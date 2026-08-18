@@ -52,6 +52,56 @@ enum DayOfWeek {
   SUNDAY
 }
 
+enum AuditAction {
+  USER_REGISTERED
+  USER_LOGGED_IN
+  USER_LOGGED_OUT
+  USER_LOGGED_OUT_ALL
+  USER_LOGGED_FAILED
+
+  EMAIL_VERIFIED
+  VERIFICATION_EMAIL_RESENT
+
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  PASSWORD_CHANGED
+
+  SESSION_REVOKED
+  SESSIONS_REVOKED
+
+  ORGANIZATION_SWITCHED
+  ORGANIZATION_UPDATED
+  ORGANIZATION_DELETED
+
+  ORGANIZATION_SETTINGS_UPDATED
+
+  WORKING_HOURS_UPDATED
+
+  MEMBER_INVITED
+  MEMBER_INVITATION_ACCEPTED
+  MEMBER_INVITATION_REJECTED
+  MEMBER_INVITATION_CANCELLED
+  MEMBER_INVITATION_REINVITED
+
+  MEMBER_ROLE_CHANGED
+  MEMBER_SUSPENDED
+  MEMBER_ACTIVATED
+  MEMBER_REMOVED
+
+  OWNERSHIP_TRANSFERRED
+  ORGANIZATION_LEFT
+}
+
+enum AuditResource {
+  USER
+  ORGANIZATION
+  MEMBERSHIP
+  INVITATION
+  SESSION
+  ORGANIZATION_SETTINGS
+  WORKING_HOURS
+}
+
 model User {
   id                  String              @id @default(uuid())
   name                String
@@ -74,6 +124,7 @@ model User {
   refreshToken        RefreshToken[]
   verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]
 }
 
 model Organization {
@@ -95,6 +146,7 @@ model Organization {
   memberships                 Membership[]
   settings                    OrganizationSettings?
   workingHours                OrganizationWorkingHour[]
+  auditLogs                   AuditLog[]
 
   @@index([name])
 }
@@ -228,4 +280,34 @@ model MembershipInvitationToken {
 
   @@index([membershipId])
   @@index([expiresAt])
+}
+
+model AuditLog {
+  id                String          @id @default(uuid())
+
+  action            AuditAction
+  resource          AuditResource
+
+  userId            String?
+  organizationId    String?
+
+  resourceId        String?
+
+  ipAddress         String?
+  userAgent         String?
+  requestId         String?
+
+  metadata          Json?
+
+  createdAt         DateTime        @default(now())
+
+  user              User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization      Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([action])
+  @@index([resource])
+  @@index([resourceId])
+  @@index([createdAt])
 }

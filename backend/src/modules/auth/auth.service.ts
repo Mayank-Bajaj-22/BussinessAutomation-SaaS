@@ -19,7 +19,7 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from ".
 import { toJwtPayload } from "../../common/mappers/jwt.mapper.js";
 import { RefreshTokenRepository } from "./repositories/refresh-token.repository.js";
 import { emailQueue } from "../../jobs/queues/email.queue.js";
-import { APP_URL } from "../../config/env.config.js";
+import { env } from "../../config/env.config.js";
 import { PasswordResetTokenRepository } from "./repositories/password-reset-token.repository.js";
 import { toMembershipResponse, toUserResponse } from "./auth.mapper.js";
 import { SessionsResponseDTO } from "./auth.response.js";
@@ -155,7 +155,7 @@ export class AuthService {
             to: user.email,
             data: {
                 name: user.name,
-                verifyUrl: `${APP_URL}/api/v1/auth/verify-email?token=${verificationToken}`
+                verifyUrl: `${env.APP_URL}/api/v1/auth/verify-email?token=${verificationToken}`
             }
         });
 
@@ -551,7 +551,7 @@ export class AuthService {
             expiresAt,
         });
 
-        const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
+        const resetUrl = `${env.APP_URL}/reset-password?token=${resetToken}`;
 
         await emailQueue.add("forgot-password", {
             type: "forgot-password",
@@ -876,7 +876,7 @@ export class AuthService {
             to: user.email,
             data: {
                 name: user.name,
-                verifyUrl: `${APP_URL}/api/v1/auth/verify-email?token=${rawToken}`
+                verifyUrl: `${env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`
             }
         });
     }

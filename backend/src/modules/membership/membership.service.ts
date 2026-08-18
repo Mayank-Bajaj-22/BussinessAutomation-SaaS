@@ -9,7 +9,7 @@ import { MembershipRepository } from "./membership.repository.js";
 import { MembershipInvitationRepository } from "../membership-invitation/membership-invitation.repository.js";
 import crypto from "crypto";
 import { hashToken } from "../../lib/bcrypt.js";
-import { APP_URL } from "../../config/env.config.js";
+import { env } from "../../config/env.config.js";
 import { emailQueue } from "../../jobs/queues/email.queue.js";
 import { toAcceptInvitationResponse, toActivateMemberResponse, toCancelInvitationResponse, toChangeMemberRoleResponse, toInviteMemberResponse, toLeaveOrganizationResponse, toMemberResponse, toMembersResponse, toRejectInvitationResponse, toRemoveMemberResponse, toSuspendResponse, toTransferOwnershipResponse } from "./membership.mapper.js";
 
@@ -207,7 +207,7 @@ export class MembershipService {
         }
 
         const invitationUrl = 
-            `${APP_URL}/accept-invitation?token=${invitationToken}`;
+            `${env.APP_URL}/accept-invitation?token=${invitationToken}`;
 
         const inviter = await this.userRepo.findById(inviterUserId);
 

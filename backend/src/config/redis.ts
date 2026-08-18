@@ -1,6 +1,6 @@
 import { Redis } from "ioredis";
 import { logger } from "../config/logger.js";
-import { REDIS_HOST, REDIS_PORT } from "./env.config.js";
+import { env } from "./env.config.js";
 
 /**
  * Redis Connection
@@ -12,8 +12,8 @@ import { REDIS_HOST, REDIS_PORT } from "./env.config.js";
  */
 
 export const redisConnection = new Redis({
-  host: REDIS_HOST as string,
-  port: Number(REDIS_PORT),
+  host: env.REDIS_HOST as string,
+  port: Number(env.REDIS_PORT),
 
   // BullMQ requires this option
   maxRetriesPerRequest: null,

@@ -1,11 +1,13 @@
-import { DayOfWeek, OrganizationWorkingHour, PrismaClient } from "@prisma/client";
+import { DayOfWeek, OrganizationWorkingHour, Prisma, PrismaClient } from "@prisma/client";
 import { IOrganizationWorkingHoursRepository } from "./organization-working-hours.repository.interface.js";
 import { prisma } from "../../lib/prisma.js";
 
 export class OrganizationWorkingHourRepository implements IOrganizationWorkingHoursRepository {
 
     constructor(
-        private readonly db: PrismaClient = prisma,
+        private readonly db: 
+            | PrismaClient
+            | Prisma.TransactionClient = prisma,
     ) {}
 
     findByOrganizationId(
