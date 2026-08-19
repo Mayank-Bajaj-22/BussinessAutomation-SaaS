@@ -102,6 +102,35 @@ enum AuditResource {
   WORKING_HOURS
 }
 
+enum WhatsAppAccountStatus {
+  CONNECTING
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+}
+
+enum MessageStatus {
+  RECEIVED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
 model User {
   id                  String              @id @default(uuid())
   name                String
@@ -147,6 +176,10 @@ model Organization {
   settings                    OrganizationSettings?
   workingHours                OrganizationWorkingHour[]
   auditLogs                   AuditLog[]
+
+  whatsappAccounts            WhatsAppAccount[]
+  contacts                    Contact[]
+  conversations               Conversation[]
 
   @@index([name])
 }
@@ -310,4 +343,111 @@ model AuditLog {
   @@index([resource])
   @@index([resourceId])
   @@index([createdAt])
+}
+
+model WhatsAppAccount {
+  id                      String                          @id @default(uuid())
+
+  organizationId          String
+
+  businessId              String
+  wabaId                  String
+  phoneNumberId           String                         @unique
+  displayPhoneNumber      String
+
+  accessTokenEncrypted    String
+
+  status                  WhatsAppAccountStatus           @default(CONNECTING)
+
+  createdAt               DateTime                        @default(now())
+  updatedAt               DateTime                        @updatedAt
+
+  organization            Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contact                 Contact[]
+  conversations           Conversation[]
+
+  @@unique([organizationId, phoneNumberId])
+  @@index([organizationId])
+  @@index([wabaId])
+  @@index([phoneNumberId])
+}
+
+model Contact {
+  id                      String                      @id @default(uuid())
+
+  organizationId          String
+  whatsappAccountId       String
+
+  phoneNumber             String
+  name                    String?
+
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+
+  organization            Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  whatsappAccount         WhatsAppAccount             @relation(fields: [whatsappAccountId], references: [id], onDelete: Cascade)
+
+  conversations           Conversation[]
+
+  @@unique([whatsappAccountId, phoneNumber])
+  @@index([organizationId])
+  @@index([whatsappAccountId])
+  @@index([phoneNumber])
+}
+
+model Conversation {
+  id                      String                  @id @default(uuid())
+
+  organizationId          String
+  whatsappAccountId       String
+  contactId               String
+
+  status                  ConversationStatus      @default(OPEN)
+
+  lastMessageAt           DateTime?
+
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  whatsappAccount         WhatsAppAccount         @relation(fields: [whatsappAccountId], references: [id], onDelete: Cascade)
+
+  contact                 Contact                 @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  messages                Message[]
+
+  @@index([organizationId])
+  @@index([whatsappAccountId])
+  @@index([contactId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id                      String                  @id @default(uuid())
+
+  conversationId          String
+
+  providerMessageId       String?
+
+  direction               MessageDirection
+  type                    MessageType            @default(TEXT)
+
+  body                    String?
+
+  status                  MessageStatus
+
+  messageTimestamp        DateTime
+
+  createdAt               DateTime              @default(now())
+
+  conversation            Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([providerMessageId])
+  @@index([conversationId])
+  @@index([messageTimestamp])
+  @@index([status])
 }
