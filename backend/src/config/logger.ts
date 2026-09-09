@@ -69,8 +69,8 @@ export const logger : AppLogger = {
     debug(message: string, data?: LogData) {
         baseLogger.debug(
             {
-                ...getContextData(),
                 ...data,
+                ...getContextData(),
             },
             message,
         );

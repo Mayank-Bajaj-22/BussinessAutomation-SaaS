@@ -1,10 +1,12 @@
 import { Contact, Conversation, Message, MessageDirection, MessageStatus, MessageType, WhatsAppAccount, WhatsAppAccountStatus } from "@prisma/client";
 import { CreateContactData, CreateConversationData, CreateWhatsAppAccountData, IWhatsAppRepository } from "./whatsapp.repository.interface.js";
 import { AppError } from "../../common/errors/AppError.js";
+import { IWhatsAppClient } from "./whatsapp.client.interface.js";
 
 export class WhatsAppService {
     constructor(
         private readonly whatsappRepository : IWhatsAppRepository,
+        private readonly whatsappClient : IWhatsAppClient,
     ) {}
 
     async connectAccount(

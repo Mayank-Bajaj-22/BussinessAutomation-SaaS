@@ -15,18 +15,28 @@ export const redisConnection = new Redis({
   host: env.REDIS_HOST as string,
   port: Number(env.REDIS_PORT),
 
-  // BullMQ requires this option
+  // Required by BullMQ.
+  // Allows commands to wait for Redis instead of
+  // failing immediately when Redis temporarily disconnects.
   maxRetriesPerRequest: null,
 });
 
 redisConnection.on("connect", () => {
-  logger.info("Redis Connected.");
+  logger.info("Redis connected.");
+});
+
+redisConnection.on("ready", () => {
+  logger.info("Redis ready.");
 });
 
 redisConnection.on("error", (err: Error) => {
-  logger.error(`Redis Connection Error: ${err.message}`);
+  logger.error(`Redis connection error: ${err.message}`);
 });
 
 redisConnection.on("close", () => {
-  logger.warn("Redis Connection Closed.");
+  logger.warn("Redis connection closed.");
+});
+
+redisConnection.on("reconnecting", () => {
+  logger.warn("Redis reconnecting...");
 });

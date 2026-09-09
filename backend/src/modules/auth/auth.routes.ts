@@ -3,6 +3,7 @@ import { validate } from "../../common/middlewares/validate.middleware.js";
 import { changePasswordController, forgotPasswordController, getCurrentUserController, getSessionsController, loginUserController, logoutAllController, logoutUserController, refreshTokenController, registerUserController, resendVerificationController, resetPasswordController, revokeSessionController, switchOrganizationController, verifyEmailController } from "./auth.controller.js";
 import { changePasswordSchema, forgotPasswordSchema, loginUserSchema, logoutUserSchema, refreshTokenSchema, registerUserSchema, resetPasswordSchema, verifyEmailSchema } from "./auth.schema.js";
 import { authMiddleware } from "../../common/middlewares/auth.middleware.js";
+import { forgotPasswordAccountLimiter, forgotPasswordIpLimiter, loginAccountLimiter, loginIpLimiter } from "../../common/security/rate-limiters.js";
 
 const router = express.Router();
 
@@ -12,7 +13,12 @@ router
 
 router
     .route("/login")
-    .post(validate(loginUserSchema), loginUserController);
+    .post(
+        loginIpLimiter,
+        loginAccountLimiter,
+        validate(loginUserSchema), 
+        loginUserController
+    );
 
 router
     .route("/refresh-token")
@@ -32,7 +38,12 @@ router
 
 router
     .route("/forgot-password")
-    .post(validate(forgotPasswordSchema), forgotPasswordController);
+    .post(
+        forgotPasswordIpLimiter,
+        forgotPasswordAccountLimiter,
+        validate(forgotPasswordSchema), 
+        forgotPasswordController
+    );
 
 router
     .route("/reset-password")

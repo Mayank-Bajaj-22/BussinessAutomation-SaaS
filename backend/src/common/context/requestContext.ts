@@ -8,6 +8,6 @@ export interface RequestContext {
 
 export const requestContext = new AsyncLocalStorage<RequestContext>();
 
-export const getRequestContext = () => {
+export const getRequestContext = (): RequestContext | undefined => {
     return requestContext.getStore();
 }

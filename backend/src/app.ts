@@ -2,19 +2,18 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import { globalErrorHandler } from "./common/middlewares/error.middleware.js";
 import { requestContextMiddleware } from "./common/middlewares/requestContext.middleware.js";
-import { globalLimiter } from "./common/middlewares/rateLimiter.middleware.js";
+import { requestLogger } from "./common/middlewares/requestLogger.middleware.js";
 
 export const app = express();
 
 app.use(requestContextMiddleware);
-
-app.use(globalLimiter);
+app.use(requestLogger);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.get("/health-check", (req, res) => {
+app.get("/health", (req, res) => {
     return res.status(200).send({
         success: true,
         message: "Api is working fine",
@@ -22,7 +21,8 @@ app.get("/health-check", (req, res) => {
 });
 
 import apiRouter from "./routes/index.js"
+import { globalLimiter } from "./common/security/rate-limiters.js";
 
-app.use("/api/v1/", apiRouter);
+app.use("/api/v1/", globalLimiter, apiRouter);
 
 app.use(globalErrorHandler);

@@ -24,6 +24,9 @@ const envSchema = z.object({
         .max(65535)
         .default(4000),
 
+    APP_URL: z
+        .url("APP_URL must be a valid URL"),
+
     DATABASE_URL: z
         .string()
         .min(1, "DATABASE_URL is required")
@@ -65,8 +68,30 @@ const envSchema = z.object({
     MAIL_FROM: z
         .email("MAIL_FROM must be a valid email address"),
 
-    APP_URL: z
-        .url("APP_URL must be a valid URL"),
+    WHATSAPP_API_VERSION: z
+        .string()
+        .min(1),
+
+    WHATSAPP_GRAPH_API_BASE_URL: z
+        .url(),
+
+    WHATSAPP_TOKEN_ENCRYPTION_KEY: z
+        .string()
+        .regex(
+            /^[0-9a-fA-F]{64}$/,
+            "WHATSAPP_TOKEN_ENCRYPTION_KEY must be a 32-byte hex key",
+        ),
+
+    META_APP_ID: z
+        .string()
+        .min(1, "META_APP_ID is required"),
+
+    META_APP_SECRET: z
+        .string()
+        .min(1, "META_APP_SECRET is required"),
+    
+    META_OAUTH_REDIRECT_URI: z
+        .url("META_OAUTH_REDIRECT_URI must be a valid URL"),
 });
 
 const result = envSchema.safeParse(process.env);
@@ -86,3 +111,5 @@ if (!result.success) {
 }
 
 export const env = result.data;
+
+export type Env = typeof env;
