@@ -3,6 +3,29 @@ import { AppError } from "../errors/AppError.js";
 import { verifyAccessToken } from "../../lib/jwt.js";
 import { prisma } from "../../lib/prisma.js";
 import { UserStatus } from "@prisma/client";
+import { updateRequestContext } from "../context/requestContext.js";
+
+function extractAccessToken(
+    req: Request,
+): string | undefined {
+    const authorization = req.headers.authorization;
+
+    if (authorization) {
+        const parts = authorization.trim().split(/\s+/);
+
+        if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+            return parts[1];
+        }
+    }
+
+    const cookieToken = req.cookies?.accessToken;
+
+    if (typeof cookieToken === "string" && cookieToken.length > 0) {
+        return cookieToken;
+    }
+
+    return undefined;
+}
 
 export const authMiddleware = async (
     req: Request,
@@ -10,19 +33,7 @@ export const authMiddleware = async (
     next: NextFunction,
 ) => {
     try {
-        let token: string | undefined;
-
-        // bearer token
-        const authHeader = req.headers.authorization;
-
-        if (authHeader && authHeader.startsWith("Bearer")) {
-            token = authHeader.split(" ")[1];
-        }
-
-        // cookie
-        if (!token && req.cookies?.accessToken) {
-            token = req.cookies.accessToken;
-        }
+        const token = extractAccessToken(req);
 
         if (!token) {
             throw new AppError(
@@ -31,11 +42,13 @@ export const authMiddleware = async (
             );
         }
 
-        const payload = verifyAccessToken(token);
+        let payload;
 
-        if (typeof payload !== "object" || payload === null) {
+        try {
+            payload = verifyAccessToken(token);
+        } catch (error) {
             throw new AppError(
-                "Invalid access token",
+                "Invalid or expired access token.",
                 401,
             );
         }
@@ -47,7 +60,10 @@ export const authMiddleware = async (
         });
 
         if (!user) {
-            throw new AppError("User not found.", 401);
+            throw new AppError(
+                "Invalid authentication",
+                401,
+            );
         }
 
         if (user.deletedAt) {
@@ -65,12 +81,21 @@ export const authMiddleware = async (
         }
 
         req.user = {
-            userId: payload.userId,
-            email: payload.email,
+            userId: user.id,
+            email: user.email,
             organizationId: payload.organizationId,
             membershipId: payload.membershipId,
-            role: payload.role,
-        }
+            role: payload.membershipRole,
+            isEmailVerified: user.isEmailVerified,
+        };
+
+        updateRequestContext({
+            userId: user.id,
+            organizationId:
+                payload.organizationId,
+            membershipId:
+                payload.membershipId,
+        });
 
         next();
     } catch (error) {

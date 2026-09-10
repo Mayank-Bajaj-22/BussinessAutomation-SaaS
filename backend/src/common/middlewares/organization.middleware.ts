@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { AppError } from "../errors/AppError.js";
 import { MembershipRepository } from "../../modules/membership/membership.repository.js";
 import { OrganizationStatus } from "@prisma/client";
+import { updateRequestContext } from "../context/requestContext.js";
 
 const membershipRepository = new MembershipRepository();
 
@@ -13,7 +14,7 @@ export const organizationMiddleware = async (
     req: Request<OrganizationParams>,
     _res: Response,
     next: NextFunction,
-) => {
+) : Promise<void> => {
     try {
         if (!req.user?.userId) {
             throw new AppError("Unauthorized.", 401);
@@ -59,6 +60,11 @@ export const organizationMiddleware = async (
 
         req.organization = membership.organization;
         req.membership = membership;
+
+        updateRequestContext({
+            organizationId: organizationId,
+            membershipId:membership.id,
+        });
 
         next();
     } catch (error) {

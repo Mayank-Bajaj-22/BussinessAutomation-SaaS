@@ -30,6 +30,8 @@ export const requestContextMiddleware = (
 ) => {
     const requestId = getRequestId(req);
 
+    req.requestId = requestId;
+
     res.setHeader("X-Request-ID", requestId);
 
     requestContext.run(
