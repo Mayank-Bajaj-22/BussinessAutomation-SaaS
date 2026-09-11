@@ -12,6 +12,7 @@ import { redisConnection } from "../../config/redis.js";
 
 export const emailWorker = new Worker<EmailJob>("email", emailProcessor, {
   connection: redisConnection,
+  prefix: "bussiness-automation",
 
   /**
    * Number of jobs processed simultaneously.

@@ -41,8 +41,8 @@ router
     .post(
         forgotPasswordIpLimiter,
         forgotPasswordAccountLimiter,
-        validate(forgotPasswordSchema), 
-        forgotPasswordController
+        validate(forgotPasswordSchema, "body"), 
+        forgotPasswordController,
     );
 
 router

@@ -1,20 +1,19 @@
 import z from "zod";
 
+const passwordSchema = z
+    .string()
+    .min(8)
+    .max(64)
+    .regex(/[A-Z]/, "Password must contain one uppercase letter.")
+    .regex(/[a-z]/, "Password must contain one lowercase letter.")
+    .regex(/[0-9]/, "Password must contain one number.")
+    .regex(/[^A-Za-z0-9]/, "Password must contain one special character.");
+
 export const registerUserSchema = z
     .object({
         name: z.string().trim().min(2, "Name must be at least 2 characters.").max(50),
         email: z.email("Invalid email address."),
-        password: z
-            .string()
-            .min(8, "Password must be at least 8 characters.")
-            .max(64)
-            .regex(/[A-Z]/, "Password must contain one uppercase letter.")
-            .regex(/[a-z]/, "Password must contain one lowercase letter.")
-            .regex(/[0-9]/, "Password must contain one number.")
-            .regex(
-                /[^A-Za-z0-9]/,
-                "Password must conatin one special character.",
-            ),
+        password: passwordSchema,
         organizationName: z.string().trim().min(2).max(100),
         timezone: z.string().trim().min(1),
     })
@@ -42,24 +41,14 @@ export const forgotPasswordSchema = z
 export const resetPasswordSchema = z
     .object({
         token: z.string(),
-        password: z
-            .string()
-            .min(8, "Password must be at least 8 characters.")
-            .max(64)
-            .regex(/[A-Z]/, "Password must contain one uppercase letter.")
-            .regex(/[a-z]/, "Password must contain one lowercase letter.")
-            .regex(/[0-9]/, "Password must contain one number.")
-            .regex(
-                /[^A-Za-z0-9]/,
-                "Password must contain one special character.",
-            ),
+        password: passwordSchema, // newPassword
     })
     .strict();
 
 export const changePasswordSchema = z
     .object({
         currentPassword: z.string(),
-        newPassword: z.string().min(8).max(64),
+        newPassword: passwordSchema,
     })
     .strict();
 

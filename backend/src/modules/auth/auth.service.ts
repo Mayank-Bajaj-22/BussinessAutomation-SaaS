@@ -59,10 +59,7 @@ export class AuthService {
 
         const verificationToken = crypto.randomBytes(32).toString("hex");
 
-        const hashedVerificationToken = crypto
-            .createHash("sha256")
-            .update(verificationToken)
-            .digest("hex");
+        const hashedVerificationToken = hashToken(verificationToken);
 
         const verificationExpiresAt = new Date(
             Date.now() + 1000 * 60 * 60 * 24 
@@ -412,11 +409,7 @@ export class AuthService {
     async verifyEmail(data: VerifyEmailDTO) {
         const { token } = data;
 
-        console.log(token);
-
         const tokenHash = hashRefreshToken(token);
-
-        console.log("Hashed token", tokenHash)
 
         const verificationToken = 
             await this.verificationTokenRepo.findByHash(
@@ -768,7 +761,7 @@ export class AuthService {
             const currentSession = 
                 await this.refreshTokenRepo.findByHash(tokenHash);
 
-            currentSessionId = currentSession?.id ?? null;
+            currentSessionId = currentSession?.sessionId ?? null;
         }
 
         return {
@@ -780,7 +773,7 @@ export class AuthService {
                 lastUsedAt: session.lastUsedAt,
                 createdAt: session.createdAt,
                 isCurrent: 
-                    session.id === currentSessionId,
+                    session.sessionId === currentSessionId,
             })),
         };
     }

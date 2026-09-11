@@ -90,8 +90,8 @@ const envSchema = z.object({
         .string()
         .min(1, "META_APP_SECRET is required"),
     
-    META_OAUTH_REDIRECT_URI: z
-        .url("META_OAUTH_REDIRECT_URI must be a valid URL"),
+    // META_OAUTH_REDIRECT_URI: z
+    //     .url("META_OAUTH_REDIRECT_URI must be a valid URL"),
 });
 
 const result = envSchema.safeParse(process.env);
