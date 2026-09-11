@@ -1,9 +1,9 @@
 import { AuditAction, AuditResource, Prisma } from "@prisma/client";
-import { AuditRepository } from "./audit.repository.js";
+import { IAuditRepository } from "./audit.repository.interface.js";
 
 export class AuditService {
     constructor(
-        private readonly auditRepo: AuditRepository,
+        private readonly auditRepo: IAuditRepository,
     ) {}
 
     async create(

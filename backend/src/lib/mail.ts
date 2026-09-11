@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { env } from "../config/env.config.js";
 import { logger } from "../config/logger.js";
+import { AppError } from "../common/errors/AppError.js";
 
 const resend = new Resend(env.RESEND_API_KEY);
 
@@ -19,7 +20,7 @@ export async function sendMail({
 } : SendMailOptions) : Promise<void> {
     try {
         const { data, error } = await resend.emails.send({
-            from: from ?? env.MAIL_FROM!,
+            from: from ?? env.MAIL_FROM,
             to,
             subject,
             html,
@@ -27,35 +28,51 @@ export async function sendMail({
 
         if (error) {
             logger.error(
-                "Failed to send email",
+                "Email provider rejected email",
                 {
-                    error,
-                    to,
+                    provider: "resend",
                     subject,
+                    error,
                 },
             );
 
-            throw new Error(error.message);
+            throw new AppError(
+                "Unable to send email.",
+                502,
+            );
         }
 
         logger.info(
             "Email sent successfully",
             {
+                provider: "resend",
                 emailId: data?.id,
-                to,
                 subject,
             }
         )
     } catch (error) {
+        if (error instanceof AppError) {
+            throw error;
+        }
+
         logger.error(
-            "Unexpected error while sending email",
+            "Unexpected email provider error",
             {
-                error,
-                to,
+                provider: "resend",
                 subject,
-            }
+                error: error instanceof Error
+                    ? {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack,
+                    }
+                    : error,
+            },
         );
 
-        throw error;
+        throw new AppError(
+            "Unable to send email.",
+            502,
+        );
     }
 }

@@ -5,9 +5,11 @@ export const isPrismaUniqueConstraintError = (
     fields: string[],
 ) : boolean => {
     if (
-        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== "P2002"
+        !(error instanceof Prisma.PrismaClientKnownRequestError)
     ) {
+        return false;
+    }
+    if (error.code !== "P2002") {
         return false;
     }
 

@@ -2,11 +2,13 @@ import { AuditLog, Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import { IAuditRepository } from "./audit.repository.interface.js";
 
+type PrismaDatabase =
+    | PrismaClient
+    | Prisma.TransactionClient;
+
 export class AuditRepository implements IAuditRepository {
     constructor(
-        private readonly db:
-            PrismaClient |
-            Prisma.TransactionClient = prisma,
+        private readonly db: PrismaDatabase = prisma,
     ) {}
 
     async create(
