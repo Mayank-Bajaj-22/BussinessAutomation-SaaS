@@ -6,6 +6,7 @@ import membershipRouter from "../modules/membership/membership.route.js";
 import organizationSettingsRouter from "../modules/organization-settings/organization-settings.route.js";
 import organizationWorkingHoursRouter from "../modules/organization-working-hours/organization-working-hours.route.js";
 import userRouter from "../modules/user/user.routes.js";
+import whatsappRouter from "../modules/whatsapp/whatsapp.routes.js";
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.use("/memberships", membershipRouter);
 router.use("/organization-settings", organizationSettingsRouter);
 router.use("/working-hours", organizationWorkingHoursRouter);
 router.use("/users", userRouter);
+router.use("/whatsapp", whatsappRouter);
 
 export default router;

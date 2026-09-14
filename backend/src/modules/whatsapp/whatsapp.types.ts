@@ -21,8 +21,8 @@ export interface WhatsAppApiErrorResponse {
         message?: string;
         type?: string;
         code?: string;
-        errorSubcode?: string;
-        fbtraceId?: string;
+        error_subcode?: string;
+        fbtrace_id?: string;
     }
 }
 

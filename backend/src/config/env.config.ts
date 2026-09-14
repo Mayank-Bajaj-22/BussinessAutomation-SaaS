@@ -70,10 +70,13 @@ const envSchema = z.object({
 
     WHATSAPP_API_VERSION: z
         .string()
-        .min(1),
+        .regex(
+            /^v\d+\.\d+$/,
+            "WHATSAPP_API_VERSION must look like v23.0",
+        ),
 
     WHATSAPP_GRAPH_API_BASE_URL: z
-        .url(),
+        .url("WHATSAPP_GRAPH_API_BASE_URL must be a valid URL"),
 
     WHATSAPP_TOKEN_ENCRYPTION_KEY: z
         .string()
@@ -90,8 +93,15 @@ const envSchema = z.object({
         .string()
         .min(1, "META_APP_SECRET is required"),
     
-    // META_OAUTH_REDIRECT_URI: z
-    //     .url("META_OAUTH_REDIRECT_URI must be a valid URL"),
+    META_OAUTH_REDIRECT_URI: z
+        .url("META_OAUTH_REDIRECT_URI must be a valid URL"),
+
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: z
+        .string()
+        .min(
+            32,
+            "WHATSAPP_WEBHOOK_VERIFY_TOKEN must be at least 32 characters",
+        ),
 });
 
 const result = envSchema.safeParse(process.env);

@@ -1,7 +1,9 @@
+import { WhatsAppClient } from "./whatsapp.client.js";
 import { WhatsAppRepository } from "./whatsapp.repository.js";
 import { WhatsAppService } from "./whatsapp.service.js";
 
 const whatsappRepository = new WhatsAppRepository();
-const whatsappService = new WhatsAppService(whatsappRepository);
+const whatsappClient = new WhatsAppClient();
+const whatsappService = new WhatsAppService(whatsappRepository, whatsappClient);
 
 export { whatsappService };

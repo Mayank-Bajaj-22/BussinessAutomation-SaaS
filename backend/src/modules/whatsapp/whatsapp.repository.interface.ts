@@ -124,4 +124,8 @@ export interface IWhatsAppRepository {
         id: string,
         status: MessageStatus,
     ) : Promise<Message>;
+
+    findMessageById(
+        id: string,
+    ) : Promise<Message | null>;
 }
