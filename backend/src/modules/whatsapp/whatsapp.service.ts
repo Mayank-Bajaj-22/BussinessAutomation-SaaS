@@ -1,5 +1,5 @@
 import { Contact, Conversation, Message, MessageDirection, MessageStatus, MessageType, WhatsAppAccount, WhatsAppAccountStatus } from "@prisma/client";
-import { CreateContactData, CreateConversationData, CreateWhatsAppAccountData, IWhatsAppRepository } from "./whatsapp.repository.interface.js";
+import { CreateContactData, CreateConversationData, CreateWhatsAppAccountData, IWhatsAppRepository, UpdateWhatsAppAccountData } from "./whatsapp.repository.interface.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { IWhatsAppClient } from "./whatsapp.client.interface.js";
 import { decryptWhatsAppToken } from "./whatsapp.crypto.js";
@@ -84,6 +84,44 @@ export class WhatsAppService {
             {
                 status: WhatsAppAccountStatus.DISCONNECTED,
             },
+        );
+    }
+
+    async updateAccount(
+        organizationId: string,
+        accountId: string,
+        data: UpdateWhatsAppAccountData,
+    ) : Promise<WhatsAppAccount> {
+        const account = 
+            await this.getAccount(
+                organizationId,
+                accountId,
+            );
+        
+        if (account.status === WhatsAppAccountStatus.DISCONNECTED) {
+            throw new AppError(
+                "Disconnected WhatsApp account cannot be updated.",
+                400,
+            );
+        }
+
+        if (data.phoneNumberId && data.phoneNumberId !== account.phoneNumberId) {
+            const existingAccount = 
+                await this.whatsappRepository.findWhatsAppAccountByPhoneNumberId(
+                    data.phoneNumberId,
+                );
+
+            if (existingAccount && existingAccount.id !== account.id) {
+                throw new AppError(
+                    "This WhatsApp phone number is already connected to another account.",
+                    409,
+                );
+            }
+        }
+
+        return this.whatsappRepository.updateWhatsAppAccount(
+            account.id,
+            data,
         );
     }
 

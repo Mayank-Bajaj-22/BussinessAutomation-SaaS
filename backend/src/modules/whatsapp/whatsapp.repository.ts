@@ -64,6 +64,16 @@ export class WhatsAppRepository implements IWhatsAppRepository {
         });
     }
 
+    async findMessageById(
+        id: string
+    ): Promise<Message | null> {
+        return prisma.message.findUnique({
+            where: {
+                id,
+            },
+        });
+    }
+
     async createContact(
         data: CreateContactData
     ): Promise<Contact> {
