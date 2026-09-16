@@ -1,5 +1,7 @@
 import { Contact, Conversation, ConversationStatus, Message, MessageDirection, MessageStatus, MessageType, WhatsAppAccount, WhatsAppAccountStatus } from "@prisma/client";
 
+// message
+
 export interface CreateWhatsAppAccountData {
     organizationId: string;
     businessId: string;
@@ -19,6 +21,8 @@ export interface UpdateWhatsAppAccountData {
     status?: WhatsAppAccountStatus;
 }
 
+// contact
+
 export interface CreateContactData {
     organizationId: string;
     whatsappAccountId: string;
@@ -30,6 +34,21 @@ export interface UpdateContactData {
     name?: string;
     phoneNumber?: string;
 }
+
+export interface ListContactsData {
+    organizationId: string;
+    whatsappAccountId: string;
+    page: number;
+    limit: number;
+    search?: string;
+}
+
+export interface ListContactsResult {
+    contacts: Contact[];
+    total: number;
+}
+
+// conversation
 
 export interface CreateConversationData {
     organizationId: string;
@@ -55,6 +74,9 @@ export interface CreateMessageData {
 }
 
 export interface IWhatsAppRepository {
+
+    // message
+
     createWhatsAppAccount(
         data: CreateWhatsAppAccountData,
     ) : Promise<WhatsAppAccount>;
@@ -76,6 +98,8 @@ export interface IWhatsAppRepository {
         data: UpdateWhatsAppAccountData,
     ) : Promise<WhatsAppAccount>;
 
+    // contact
+
     createContact(
         data: CreateContactData,
     ) : Promise<Contact>;
@@ -89,10 +113,20 @@ export interface IWhatsAppRepository {
         phoneNumber: string,
     ) : Promise<Contact | null>;
 
+    listContacts(
+        data: ListContactsData,
+    ) : Promise<ListContactsResult>;
+
     updateContact(
         id: string,
         data: UpdateContactData,
     ) : Promise<Contact>;
+
+    deleteContact(
+        id: string,
+    ) : Promise<Contact>;
+
+    // conversation
 
     createConversation(
         data: CreateConversationData,
@@ -111,6 +145,8 @@ export interface IWhatsAppRepository {
         id: string,
         data: UpdateConversationData,
     ): Promise<Conversation>;
+
+    // message
 
     createMessage(
         data: CreateMessageData,

@@ -1,5 +1,5 @@
 import { Contact, Conversation, Message, MessageDirection, MessageStatus, MessageType, WhatsAppAccount, WhatsAppAccountStatus } from "@prisma/client";
-import { CreateContactData, CreateConversationData, CreateWhatsAppAccountData, IWhatsAppRepository, UpdateWhatsAppAccountData } from "./whatsapp.repository.interface.js";
+import { CreateContactData, CreateConversationData, CreateWhatsAppAccountData, IWhatsAppRepository, UpdateContactData, UpdateWhatsAppAccountData } from "./whatsapp.repository.interface.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { IWhatsAppClient } from "./whatsapp.client.interface.js";
 import { decryptWhatsAppToken } from "./whatsapp.crypto.js";
@@ -125,6 +125,201 @@ export class WhatsAppService {
         );
     }
 
+    async getContactForAccount(
+        organizationId: string,
+        whatsappAccountId: string,
+        contactId: string,
+    ) : Promise<Contact> {
+        await this.getAccount(
+            organizationId,
+            whatsappAccountId,
+        );
+
+        const contact = 
+            await this.whatsappRepository.findContactById(
+                contactId,
+            );
+
+        if (!contact) {
+            throw new AppError(
+                "Contact not found.",
+                404,
+            );
+        }
+
+        if (contact.organizationId !== organizationId || contact.whatsappAccountId !== whatsappAccountId) {
+            throw new AppError(
+                "Contact does not belong to this WhatsApp account.",
+                403,
+            );
+        }
+
+        return contact;
+    }
+
+    async createContact(
+        organizationId: string,
+        whatsappAccountId: string,
+        data: CreateContactData,
+    ) : Promise<Contact> {
+        const account = 
+            await this.getAccount(
+                organizationId,
+                whatsappAccountId,
+            );
+
+        if (account.status === WhatsAppAccountStatus.DISCONNECTED) {
+            throw new AppError(
+                "Cannot create contact for a disconnected WhatsApp account.",
+                400,
+            );
+        }
+
+        const exisitingContact = 
+            await this.whatsappRepository.findContactByPhoneNumber(
+                whatsappAccountId,
+                data.phoneNumber,
+            );
+
+        if (exisitingContact) {
+            throw new AppError(
+                "A contact with this phone number already exists.",
+                409,
+            );
+        }
+
+        try {
+            return this.whatsappRepository.createContact({
+                organizationId,
+                whatsappAccountId,
+                phoneNumber: data.phoneNumber,
+                name: data.name,
+            });
+        } catch (error: any) {
+            /*
+             * Database-level protection.
+             *
+             * Even if two requests arrive at exactly
+             * the same time, the Prisma unique constraint
+             * protects us from duplicate contacts.
+             */
+
+            if (error?.code === "P2002") {
+                throw new AppError(
+                    "A contact with this phone number already exists.",
+                    409,
+                );
+            } 
+            
+            throw error;
+        }
+    }
+
+    async getContact(
+        organizationId: string,
+        whatsappAccountId: string,
+        contactId: string,
+    ): Promise<Contact> {
+
+        return this.getContactForAccount(
+            organizationId,
+            whatsappAccountId,
+            contactId,
+        );
+    }
+
+    async listContacts(
+        organizationId: string,
+        whatsappAccountId: string,
+        data: {
+            page: number,
+            limit: number,
+            search?: string,
+        },
+    ) {
+        await this.getAccount(
+            organizationId,
+            whatsappAccountId,
+        );
+
+        return this.whatsappRepository.listContacts({
+            organizationId,
+            whatsappAccountId,
+            page: data.page,
+            limit: data.limit,
+            search: data.search,
+        });
+    }
+
+    async updateContact(
+        organizationId: string,
+        whatsappAccountId: string,
+        contactId: string,
+        data: UpdateContactData,
+    ) : Promise<Contact> {
+        const contact = 
+            await this.getContactForAccount(
+                organizationId,
+                whatsappAccountId,
+                contactId,
+            );
+
+        /*
+            * If phone number is being changed,
+            * make sure another contact doesn't
+            * already use it.
+        */
+
+        if (data.phoneNumber && data.phoneNumber !== contact.phoneNumber) {
+            const exisitingAccount = 
+                await this.whatsappRepository.findContactByPhoneNumber(
+                    whatsappAccountId,
+                    data.phoneNumber,
+                );
+
+            if (exisitingAccount && exisitingAccount.id !== contact.id) {
+                throw new AppError(
+                    "A contact with this phone number already exists.",
+                    409,
+                );
+            }
+        }
+
+        try {
+            return await this.whatsappRepository
+                .updateContact(
+                    contact.id,
+                    data,
+                );
+        } catch (error: any) {
+            if (error?.code === "P2002") {
+                throw new AppError(
+                    "A contact with this phone number already exists.",
+                    409,
+                );
+            }
+
+            throw error;
+        }
+    }
+
+    async deleteContact(
+        organizationId: string,
+        whatsappAccountId: string,
+        contactId: string,
+    ) : Promise<Contact> {
+        const contact = 
+            await this.getContactForAccount(
+                organizationId,
+                whatsappAccountId,
+                contactId,
+            );
+
+        return this.whatsappRepository.deleteContact(
+            contact.id,
+        );
+    }
+
     async getOrCreateContact(
         data: CreateContactData,
     ) : Promise<Contact> {
@@ -135,7 +330,7 @@ export class WhatsAppService {
             );
 
         if (exisitingContact) {
-            if (data.name && data.name !== exisitingContact.name)  {
+            if (data.name && data.name !== exisitingContact.name) {
                 return this.whatsappRepository.updateContact(
                     exisitingContact.id,
                     {
@@ -147,7 +342,25 @@ export class WhatsAppService {
             return exisitingContact;
         }
 
-        return this.whatsappRepository.createContact(data);
+        try {
+            return await this.whatsappRepository.createContact(
+                data,
+            );
+        } catch (error: any) {
+            if (error?.code === "P2002") {
+                const contact = 
+                    await this.whatsappRepository.findContactByPhoneNumber(
+                        data.whatsappAccountId,
+                        data.phoneNumber,
+                    );
+
+                if (contact) {
+                    return contact;
+                }
+            }
+
+            throw error;
+        }
     }
 
     async getOrCreateConversation(
@@ -301,7 +514,10 @@ export class WhatsAppService {
         }
 
         // 1. Get whatsapp account
-        const account = await this.getAccount(data.organizationId, data.whatsappAccountId);
+        const account = await this.getAccount(
+            data.organizationId, 
+            data.whatsappAccountId
+        );
 
         // 2. Check account status
         if (account.status === WhatsAppAccountStatus.DISCONNECTED) {

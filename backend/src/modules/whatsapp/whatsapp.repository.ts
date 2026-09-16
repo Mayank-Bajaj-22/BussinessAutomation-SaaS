@@ -1,5 +1,5 @@
 import { Contact, Conversation, ConversationStatus, Message, MessageStatus, WhatsAppAccount, WhatsAppAccountStatus } from "@prisma/client";
-import { CreateContactData, CreateConversationData, CreateMessageData, CreateWhatsAppAccountData, IWhatsAppRepository, UpdateContactData, UpdateConversationData, UpdateWhatsAppAccountData } from "./whatsapp.repository.interface.js";
+import { CreateContactData, CreateConversationData, CreateMessageData, CreateWhatsAppAccountData, IWhatsAppRepository, ListContactsData, ListContactsResult, UpdateContactData, UpdateConversationData, UpdateWhatsAppAccountData } from "./whatsapp.repository.interface.js";
 import { prisma } from "../../lib/prisma.js";
 
 export class WhatsAppRepository implements IWhatsAppRepository {
@@ -111,6 +111,57 @@ export class WhatsAppRepository implements IWhatsAppRepository {
         });
     }
 
+    async listContacts(
+        data: ListContactsData
+    ): Promise<ListContactsResult> {
+        const { organizationId, whatsappAccountId, page, limit, search } = data;
+
+        const skip = (page - 1) * limit;
+
+        const where = {
+            organizationId,
+            whatsappAccountId,
+            ...(search
+                ? {
+                    OR: [
+                        {
+                            name: {
+                                contains: search,
+                                mode: 'insensitive' as const,
+                            },
+                        },
+                        {
+                            phoneNumber: {
+                                contains: search,
+                                mode: 'insensitive' as const,
+                            },
+                        },
+                    ],
+                }
+                : {}),
+        };
+
+        const [contacts, total] = await prisma.$transaction([
+            prisma.contact.findMany({
+                where,
+                orderBy: {
+                    createdAt: "desc",
+                },
+                skip,
+                take: limit,
+            }),
+
+            prisma.contact.count({
+                where,
+            }),
+        ]);
+
+        return {
+            contacts,
+            total,
+        };
+    }
+
     async updateContact(
         id: string, 
         data: UpdateContactData
@@ -120,6 +171,17 @@ export class WhatsAppRepository implements IWhatsAppRepository {
                 id,
             },
             data,
+        });
+    }
+
+    async deleteContact(
+        id: string,
+    ): Promise<Contact> {
+
+        return prisma.contact.delete({
+            where: {
+                id,
+            },
         });
     }
 

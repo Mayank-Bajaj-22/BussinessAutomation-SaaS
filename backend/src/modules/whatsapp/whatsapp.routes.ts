@@ -1,8 +1,8 @@
 import express from "express";
 import { authMiddleware } from "../../common/middlewares/auth.middleware.js";
 import { validate } from "../../common/middlewares/validate.middleware.js";
-import { createWhatsAppAccountSchema, sendWhatsAppTextMessageSchema, updateWhatsAppAccountSchema } from "./whatsapp.schema.js";
-import { connectAccount, disconnectAccount, getAccount, getAccounts, sendMessage, updateAccount } from "./whatsapp.controller.js";
+import { createContactSchema, createWhatsAppAccountSchema, listContactsQuerySchema, sendWhatsAppTextMessageSchema, updateContactSchema, updateWhatsAppAccountSchema } from "./whatsapp.schema.js";
+import { connectAccount, createContact, deleteContact, disconnectAccount, getAccount, getAccounts, getContact, getContacts, sendMessage, updateAccount, updateContact } from "./whatsapp.controller.js";
 
 const router = express.Router();
 
@@ -49,6 +49,44 @@ router
         authMiddleware,
         validate(sendWhatsAppTextMessageSchema),
         sendMessage,
+    );
+
+router
+    .route("/accounts/:accountId/contacts")
+    .post(
+        authMiddleware,
+        validate(createContactSchema),
+        createContact,
+    );
+
+router
+    .route("/accounts/:accountId/contacts")
+    .get(
+        authMiddleware,
+        validate(listContactsQuerySchema, "query"),
+        getContacts,
+    );
+
+router
+    .route("/accounts/:accountId/contacts/:contactId")
+    .get(
+        authMiddleware,
+        getContact,
+    );
+
+router
+    .route("/accounts/:accountId/contacts/:contactId")
+    .patch(
+        authMiddleware,
+        validate(updateContactSchema),
+        updateContact,
+    );
+
+router
+    .route("/accounts/:accountId/contacts/:contactId")
+    .delete(
+        authMiddleware,
+        deleteContact,
     );
 
 export default router;

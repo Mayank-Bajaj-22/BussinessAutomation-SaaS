@@ -36,7 +36,10 @@ export const validate =
                 return;
             }
 
-            // req[source] = result.data as never;
+            _res.locals.validated = {
+                ...(_res.locals.validated ?? {}),
+                [source]: result.data,
+            };
 
             next();
         } catch (error) {

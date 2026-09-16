@@ -12,7 +12,7 @@ import { redisConnection } from "../../config/redis.js";
 export const emailQueue = new Queue<EmailJob>("email", {
   connection: redisConnection,
 
-  prefix: "bussiness-automation",
+  prefix: "business-automation",
 
   defaultJobOptions: {
     attempts: 3,
