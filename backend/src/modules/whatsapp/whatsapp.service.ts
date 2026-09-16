@@ -1,13 +1,15 @@
-import { Contact, Conversation, Message, MessageDirection, MessageStatus, MessageType, WhatsAppAccount, WhatsAppAccountStatus } from "@prisma/client";
-import { CreateContactData, CreateConversationData, CreateWhatsAppAccountData, IWhatsAppRepository, UpdateContactData, UpdateWhatsAppAccountData } from "./whatsapp.repository.interface.js";
+import { Message, MessageStatus, WhatsAppAccount, WhatsAppAccountStatus } from "@prisma/client";
+import { CreateWhatsAppAccountData, IWhatsAppRepository, UpdateWhatsAppAccountData } from "./whatsapp.repository.interface.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { IWhatsAppClient } from "./whatsapp.client.interface.js";
 import { decryptWhatsAppToken } from "./whatsapp.crypto.js";
+import { ContactService } from "./contact/contact.service.js";
 
 export class WhatsAppService {
     constructor(
         private readonly whatsappRepository : IWhatsAppRepository,
         private readonly whatsappClient : IWhatsAppClient,
+        private readonly contactService : ContactService,
     ) {}
 
     async connectAccount(
@@ -125,266 +127,6 @@ export class WhatsAppService {
         );
     }
 
-    async getContactForAccount(
-        organizationId: string,
-        whatsappAccountId: string,
-        contactId: string,
-    ) : Promise<Contact> {
-        await this.getAccount(
-            organizationId,
-            whatsappAccountId,
-        );
-
-        const contact = 
-            await this.whatsappRepository.findContactById(
-                contactId,
-            );
-
-        if (!contact) {
-            throw new AppError(
-                "Contact not found.",
-                404,
-            );
-        }
-
-        if (contact.organizationId !== organizationId || contact.whatsappAccountId !== whatsappAccountId) {
-            throw new AppError(
-                "Contact does not belong to this WhatsApp account.",
-                403,
-            );
-        }
-
-        return contact;
-    }
-
-    async createContact(
-        organizationId: string,
-        whatsappAccountId: string,
-        data: CreateContactData,
-    ) : Promise<Contact> {
-        const account = 
-            await this.getAccount(
-                organizationId,
-                whatsappAccountId,
-            );
-
-        if (account.status === WhatsAppAccountStatus.DISCONNECTED) {
-            throw new AppError(
-                "Cannot create contact for a disconnected WhatsApp account.",
-                400,
-            );
-        }
-
-        const exisitingContact = 
-            await this.whatsappRepository.findContactByPhoneNumber(
-                whatsappAccountId,
-                data.phoneNumber,
-            );
-
-        if (exisitingContact) {
-            throw new AppError(
-                "A contact with this phone number already exists.",
-                409,
-            );
-        }
-
-        try {
-            return this.whatsappRepository.createContact({
-                organizationId,
-                whatsappAccountId,
-                phoneNumber: data.phoneNumber,
-                name: data.name,
-            });
-        } catch (error: any) {
-            /*
-             * Database-level protection.
-             *
-             * Even if two requests arrive at exactly
-             * the same time, the Prisma unique constraint
-             * protects us from duplicate contacts.
-             */
-
-            if (error?.code === "P2002") {
-                throw new AppError(
-                    "A contact with this phone number already exists.",
-                    409,
-                );
-            } 
-            
-            throw error;
-        }
-    }
-
-    async getContact(
-        organizationId: string,
-        whatsappAccountId: string,
-        contactId: string,
-    ): Promise<Contact> {
-
-        return this.getContactForAccount(
-            organizationId,
-            whatsappAccountId,
-            contactId,
-        );
-    }
-
-    async listContacts(
-        organizationId: string,
-        whatsappAccountId: string,
-        data: {
-            page: number,
-            limit: number,
-            search?: string,
-        },
-    ) {
-        await this.getAccount(
-            organizationId,
-            whatsappAccountId,
-        );
-
-        return this.whatsappRepository.listContacts({
-            organizationId,
-            whatsappAccountId,
-            page: data.page,
-            limit: data.limit,
-            search: data.search,
-        });
-    }
-
-    async updateContact(
-        organizationId: string,
-        whatsappAccountId: string,
-        contactId: string,
-        data: UpdateContactData,
-    ) : Promise<Contact> {
-        const contact = 
-            await this.getContactForAccount(
-                organizationId,
-                whatsappAccountId,
-                contactId,
-            );
-
-        /*
-            * If phone number is being changed,
-            * make sure another contact doesn't
-            * already use it.
-        */
-
-        if (data.phoneNumber && data.phoneNumber !== contact.phoneNumber) {
-            const exisitingAccount = 
-                await this.whatsappRepository.findContactByPhoneNumber(
-                    whatsappAccountId,
-                    data.phoneNumber,
-                );
-
-            if (exisitingAccount && exisitingAccount.id !== contact.id) {
-                throw new AppError(
-                    "A contact with this phone number already exists.",
-                    409,
-                );
-            }
-        }
-
-        try {
-            return await this.whatsappRepository
-                .updateContact(
-                    contact.id,
-                    data,
-                );
-        } catch (error: any) {
-            if (error?.code === "P2002") {
-                throw new AppError(
-                    "A contact with this phone number already exists.",
-                    409,
-                );
-            }
-
-            throw error;
-        }
-    }
-
-    async deleteContact(
-        organizationId: string,
-        whatsappAccountId: string,
-        contactId: string,
-    ) : Promise<Contact> {
-        const contact = 
-            await this.getContactForAccount(
-                organizationId,
-                whatsappAccountId,
-                contactId,
-            );
-
-        return this.whatsappRepository.deleteContact(
-            contact.id,
-        );
-    }
-
-    async getOrCreateContact(
-        data: CreateContactData,
-    ) : Promise<Contact> {
-        const exisitingContact = 
-            await this.whatsappRepository.findContactByPhoneNumber(
-                data.whatsappAccountId,
-                data.phoneNumber,
-            );
-
-        if (exisitingContact) {
-            if (data.name && data.name !== exisitingContact.name) {
-                return this.whatsappRepository.updateContact(
-                    exisitingContact.id,
-                    {
-                        name: data.name,
-                    },
-                );
-            }
-
-            return exisitingContact;
-        }
-
-        try {
-            return await this.whatsappRepository.createContact(
-                data,
-            );
-        } catch (error: any) {
-            if (error?.code === "P2002") {
-                const contact = 
-                    await this.whatsappRepository.findContactByPhoneNumber(
-                        data.whatsappAccountId,
-                        data.phoneNumber,
-                    );
-
-                if (contact) {
-                    return contact;
-                }
-            }
-
-            throw error;
-        }
-    }
-
-    async getOrCreateConversation(
-        data: CreateConversationData,
-    ) : Promise<Conversation> {
-        const existingConversation = 
-            await this.whatsappRepository.findOpenConversation(
-                data.whatsappAccountId,
-                data.contactId,
-            );
-
-        if (existingConversation) {
-            return existingConversation;
-        }
-
-        return this.whatsappRepository.createConversation({
-            organizationId: data.organizationId,
-            whatsappAccountId: data.whatsappAccountId,
-            contactId: data.contactId,
-            status: "OPEN",
-            lastMessageAt: data.lastMessageAt,
-        });
-    }
-
     async createIncomingMessage(data: {
         organizationId: string;
         whatsappAccountId: string;
@@ -405,76 +147,113 @@ export class WhatsAppService {
         }
 
         const contact = 
-            await this.getOrCreateContact({
+            await this.contactService.getOrCreateContact({
                 organizationId: data.organizationId,
                 whatsappAccountId: data.whatsappAccountId,
                 phoneNumber: data.contactPhoneNumber,
                 name: data.contactName,
             });
 
-        const conversation = 
-            await this.getOrCreateConversation({
-                organizationId: data.organizationId,
-                whatsappAccountId: data.whatsappAccountId,
-                contactId: contact.id,
-                lastMessageAt: data.messageTimestamp,
-            });
+        /*
+            * Conversation will be handled by
+            * ConversationService in Step 4.
+            *
+            * TEMPORARILY this part stays out of this
+            * Contact separation refactor.
+        */
 
-        const message =
-            await this.whatsappRepository.createMessage({
-                conversationId: conversation.id,
-                providerMessageId: data.providerMessageId,
-                direction: MessageDirection.INBOUND,
-                type: MessageType.TEXT,
-                body: data.body,
-                status: MessageStatus.RECEIVED,
-                messageTimestamp: data.messageTimestamp,
-            });
-
-        await this.whatsappRepository.updateConversation(
-            conversation.id,
-            {
-                lastMessageAt: data.messageTimestamp,
-            },
+        throw new AppError(
+            "ConversationService must be wired before processing incoming messages.",
+            500,
         );
-
-        return message;
     }
 
-    async createOutgoingMessage(data: {
+    async sendTextMessage(data: {
         organizationId: string;
         whatsappAccountId: string;
         contactId: string;
         body: string;
-    }) : Promise<Message> {
-        const conversation =
-            await this.getOrCreateConversation({
-                organizationId: data.organizationId,
-                whatsappAccountId: data.whatsappAccountId,
-                contactId: data.contactId,
-                lastMessageAt: new Date(),
+    }): Promise<Message> {
+
+        const body = data.body.trim();
+
+        if (!body) {
+            throw new AppError(
+                "Message body cannot be empty.",
+                400,
+            );
+        }
+
+        // Account ownership
+        const account =
+            await this.getAccount(
+                data.organizationId,
+                data.whatsappAccountId,
+            );
+
+        if (
+            account.status ===
+            WhatsAppAccountStatus.DISCONNECTED
+        ) {
+            throw new AppError(
+                "WhatsApp account is disconnected.",
+                400,
+            );
+        }
+
+        // Contact ownership
+        const contact =
+            await this.contactService.getContact(
+                data.organizationId,
+                data.whatsappAccountId,
+                data.contactId,
+            );
+
+        // Decrypt Meta token
+        const accessToken =
+            decryptWhatsAppToken(
+                account.accessTokenEncrypted,
+            );
+
+        // Send to Meta
+        const metaResponse =
+            await this.whatsappClient.sendTextMessage({
+                phoneNumberId:
+                    account.phoneNumberId,
+
+                accessToken,
+
+                recipientPhoneNumber:
+                    contact.phoneNumber,
+
+                body,
             });
 
-        const now = new Date();
+        const providerMessageId =
+            metaResponse.messages?.[0]?.id;
 
-        const message =
-            await this.whatsappRepository.createMessage({
-                conversationId: conversation.id,
-                direction: MessageDirection.OUTBOUND,
-                type: MessageType.TEXT,
-                body: data.body,
-                status: MessageStatus.SENT,
-                messageTimestamp: now,
-            });
+        if (!providerMessageId) {
+            throw new AppError(
+                "WhatsApp message ID was not returned by Meta.",
+                502,
+            );
+        }
 
-        await this.whatsappRepository.updateConversation(
-            conversation.id,
-            {
-                lastMessageAt: now,
-            },
+        /*
+            * ConversationService will own:
+            *
+            * getOrCreateConversation()
+            *
+            * and MessageService will eventually own
+            * message persistence.
+            *
+            * We will wire this properly in Step 4.
+        */
+
+        throw new AppError(
+            "ConversationService must be wired before storing outgoing messages.",
+            500,
         );
-
-        return message;
     }
 
     async updateMessageStatus(
@@ -482,10 +261,12 @@ export class WhatsAppService {
         messageId: string,
         status: MessageStatus,
     ): Promise<Message> {
+
         const message =
-            await this.whatsappRepository.findMessageByProviderId(
-                messageId,
-            );
+            await this.whatsappRepository
+                .findMessageByProviderId(
+                    messageId,
+                );
 
         if (!message) {
             throw new AppError(
@@ -498,124 +279,5 @@ export class WhatsAppService {
             message.id,
             status,
         );
-    }
-
-    async sendTextMessage(data: {
-        organizationId: string;
-        whatsappAccountId: string;
-        contactId: string;
-        body: string;
-    }): Promise<Message> {
-        if (!data.body.trim()) {
-            throw new AppError(
-                "Message body cannot be empty.",
-                400,
-            );
-        }
-
-        // 1. Get whatsapp account
-        const account = await this.getAccount(
-            data.organizationId, 
-            data.whatsappAccountId
-        );
-
-        // 2. Check account status
-        if (account.status === WhatsAppAccountStatus.DISCONNECTED) {
-            throw new AppError(
-                "WhatsApp account is disconnected.",
-                400,
-            );
-        }
-
-        // 3. Get contact
-        const contact = await this.whatsappRepository.findContactById(data.contactId);
-
-        if (!contact) {
-            throw new AppError(
-                "Contact not found.",
-                404,
-            );
-        }
-
-        /*
-            * 4. Security check
-            *
-            * Contact must belong to the same organization
-            * and WhatsApp account.
-        */
-
-        if (
-            contact.organizationId !== data.organizationId ||
-            contact.whatsappAccountId !== data.whatsappAccountId
-        ) {
-            throw new AppError(
-                "Contact does not belong to this WhatsApp account.",
-                403,
-            );
-        }
-
-        // 5. Decrypt Meta access token
-        const accessToken = decryptWhatsAppToken(account.accessTokenEncrypted);
-
-        // 6. Send message to Meta
-        const metaResponse = await this.whatsappClient.sendTextMessage({
-            phoneNumberId: account.phoneNumberId,
-            accessToken,
-            recipientPhoneNumber: contact.phoneNumber,
-            body: data.body.trim(),
-        });
-
-        // 7. Get Meta's provider message ID
-        const providerMessageId = metaResponse.messages?.[0]?.id;
-
-        if (!providerMessageId) {
-            throw new AppError(
-                "WhatsApp message ID was not returned by Meta.",
-                502,
-            );
-        }
-
-        // 8. Create / get conversation
-        const now = new Date();
-
-        const conversation = await this.getOrCreateConversation({
-            organizationId: data.organizationId,
-            whatsappAccountId: data.whatsappAccountId,
-            contactId: data.contactId,
-            lastMessageAt: now,
-        });
-
-        /*
-            * 9. Store outgoing message
-            *
-            * SENT here means Meta accepted the message.
-            * Later webhook can change it to:
-            *
-            * DELIVERED
-            * READ
-            * FAILED
-        */
-        const message = await this.whatsappRepository.createMessage({
-            conversationId: conversation.id,
-            providerMessageId,
-            direction: MessageDirection.OUTBOUND,
-            type: MessageType.TEXT,
-            body: data.body.trim(),
-
-            // Important:
-            // Meta accepted the message.
-            status: MessageStatus.SENT,
-            messageTimestamp: now,
-        });
-
-        // 10. Update conversation
-        await this.whatsappRepository.updateConversation(
-            conversation.id,
-            {
-                lastMessageAt: now,
-            },
-        );
-
-        return message;
     }
 }
