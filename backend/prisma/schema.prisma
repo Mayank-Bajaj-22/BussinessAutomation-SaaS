@@ -424,6 +424,7 @@ model Conversation {
   @@index([contactId])
   @@index([status])
   @@index([lastMessageAt])
+  @@index([whatsappAccountId, contactId, status])
 }
 
 model Message {

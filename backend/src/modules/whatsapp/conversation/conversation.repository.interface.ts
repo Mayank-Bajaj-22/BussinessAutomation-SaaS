@@ -13,6 +13,12 @@ export interface UpdateConversationData {
     lastMessageAt?: Date;
 }
 
+export interface ListConversationsParams {
+    page: number;
+    limit: number;
+    status?: ConversationStatus;
+}
+
 export interface IConversationRepository {
     createConversation(
         data: CreateConversationData,
@@ -31,4 +37,20 @@ export interface IConversationRepository {
         id: string,
         data: UpdateConversationData,
     ): Promise<Conversation>;
+
+    findConversationsByAccount(
+        whatsappAccountId: string,
+        params: ListConversationsParams,
+    ) : Promise<{
+        conversations: Conversation[];
+        total: number;
+    }>;
+
+    findConversationsByContact(
+        contactId: string,
+        params: ListConversationsParams,
+    ) : Promise<{
+        conversations: Conversation[];
+        total: number;
+    }>;
 }
