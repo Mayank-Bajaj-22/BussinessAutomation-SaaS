@@ -46,4 +46,19 @@ function getContactId(
     return contactId;
 }
 
-export { getOrganizationId, getAccountId, getContactId };
+function getConversationId(
+    req: Request,
+) : string {
+    const conversationId = req.params.conversationId as string;
+
+    if (!conversationId) {
+        throw new AppError(
+            "Conversation ID is required.",
+            400,
+        );
+    }
+
+    return conversationId;
+}
+
+export { getOrganizationId, getAccountId, getContactId, getConversationId };
