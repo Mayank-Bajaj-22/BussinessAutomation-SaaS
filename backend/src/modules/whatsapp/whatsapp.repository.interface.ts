@@ -19,16 +19,6 @@ export interface UpdateWhatsAppAccountData {
     status?: WhatsAppAccountStatus;
 }
 
-export interface CreateMessageData {
-    conversationId: string;
-    providerMessageId?: string;
-    direction: MessageDirection;
-    type?: MessageType;
-    body?: string;
-    status: MessageStatus;
-    messageTimestamp: Date;
-}
-
 export interface IWhatsAppRepository {
     createWhatsAppAccount(
         data: CreateWhatsAppAccountData,
@@ -50,23 +40,4 @@ export interface IWhatsAppRepository {
         id: string,
         data: UpdateWhatsAppAccountData,
     ) : Promise<WhatsAppAccount>;
-
-    // message
-
-    createMessage(
-        data: CreateMessageData,
-    ) : Promise<Message>;
-
-    findMessageByProviderId(
-        providerMessageId: string,
-    ) : Promise<Message | null>;
-
-    updateMessageStatus(
-        id: string,
-        status: MessageStatus,
-    ) : Promise<Message>;
-
-    findMessageById(
-        id: string,
-    ) : Promise<Message | null>;
 }

@@ -61,4 +61,19 @@ function getConversationId(
     return conversationId;
 }
 
-export { getOrganizationId, getAccountId, getContactId, getConversationId };
+function getMessageId(
+    req: Request,
+) : string {
+    const messageId = req.params.messageId as string;
+
+    if (!messageId) {
+        throw new AppError(
+            "Message ID is required.",
+            400,
+        );
+    }
+
+    return messageId;
+}
+
+export { getOrganizationId, getAccountId, getContactId, getConversationId, getMessageId };
