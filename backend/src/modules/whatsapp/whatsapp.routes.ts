@@ -7,6 +7,7 @@ import { connectAccount, disconnectAccount, getAccount, getAccounts, updateAccou
 import contactRoutes from "./contact/contact.route.js";
 import conversationRoutes from "./conversation/conversation.route.js";
 import messageRoutes from "./message/message.route.js";
+import webhookRoutes from "./webhook/webhook.route.js";
 
 const router = express.Router();
 
@@ -41,5 +42,6 @@ router
 router.use(contactRoutes);
 router.use(conversationRoutes);
 router.use(messageRoutes);
+router.use(webhookRoutes);
 
 export default router;
