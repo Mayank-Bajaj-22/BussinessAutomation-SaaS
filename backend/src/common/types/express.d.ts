@@ -16,6 +16,7 @@ declare global {
             };
             organization?: Organization;
             membership?: Membership;
+            rawBody?: Buffer;
         }
     }
 }
