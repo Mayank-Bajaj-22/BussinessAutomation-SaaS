@@ -4,6 +4,7 @@ import { IWhatsAppAccountRepository } from "../account/whatsapp-account.reposito
 import { ContactService } from "../contact/contact.service.js";
 import { ConversationService } from "../conversation/conversation.service.js";
 import { MessageService } from "../message/message.service.js";
+import { WebhookEventService } from "./webhook-event.service.js";
 import { WEBHOOK_MODES } from "./webhook.constants.js";
 import { verifyWhatsAppWebhookSignature } from "./webhook.crypto.js";
 import { WhatsAppWebhookChange, WhatsAppWebhookContact, WhatsAppWebhookMessage, WhatsAppWebhookPayload } from "./webhook.types.js";
@@ -26,6 +27,7 @@ export class WebhookService {
         private readonly contactService: ContactService,
         private readonly conversationService: ConversationService,
         private readonly messageService: MessageService,
+        private readonly webhookEventService: WebhookEventService,
     ) {}
 
     verifyWebhook(
