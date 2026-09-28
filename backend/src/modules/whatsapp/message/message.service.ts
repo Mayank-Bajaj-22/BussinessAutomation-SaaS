@@ -1,4 +1,4 @@
-import { MessageDirection, MessageStatus, MessageType } from "@prisma/client";
+import { MessageDirection, MessageStatus, MessageType, Prisma } from "@prisma/client";
 import { AppError } from "../../../common/errors/AppError.js";
 import { IWhatsAppAccountRepository } from "../account/whatsapp-account.repository.interface.js";
 import { ContactService } from "../contact/contact.service.js";
@@ -161,5 +161,69 @@ export class MessageService {
         }
 
         return message;
+    }
+
+    async findMessageProviderId(
+        providerMessageId: string,
+    ) {
+        return this.messageRepository.findMessageByProviderId(
+            providerMessageId,
+        );
+    }
+
+    async createIncomingMessage(
+        input: {
+            conversationId: string;
+            providerMessageId: string;
+            body: string | null;
+            messageTimestamp: Date;
+        },
+    ) {
+        try {
+            return this.messageRepository.createMessage({
+                conversationId: input.conversationId,
+                providerMessageId: input.providerMessageId,
+                direction: "INBOUND",
+                type: "TEXT",
+                body: input.body,
+                status: "RECEIVED",
+                messageTimestamp: input.messageTimestamp,
+            });
+        } catch (error) {
+            if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === "P2002"
+            ) {
+                return this.messageRepository.findMessageByProviderId(
+                    input.providerMessageId,
+                );
+            }
+
+            throw error;
+        }
+    }
+
+    async processStatusUpdate(
+        providerMessageId: string,
+        status: MessageStatus,
+    ) {
+        const message = 
+            await this.messageRepository.findMessageByProviderId(
+                providerMessageId,
+            );
+
+        if (!message) {
+            /**
+             * Status webhook arrived before we have
+             * the message locally.
+             *
+             * Do not create an incomplete message.
+             */
+            return null;
+        }
+
+        if (message.status === status) {
+            return message;
+        }
     }
 }

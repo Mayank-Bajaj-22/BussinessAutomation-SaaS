@@ -15,9 +15,16 @@ export interface UpdateMessageData {
     body?: string | null;
 }
 
+export interface UpdateMessageStatusData {
+    messageId: string;
+    status: MessageStatus;
+    allowedPreviousStatuses: MessageStatus[];
+}
+
 export interface IMessageRepository {
     createMessage(data: CreateMessageData): Promise<Message>;
     findMessageById(id: string): Promise<Message | null>;
     findMessageByProviderId(providerMessageId: string): Promise<Message | null>;
     updateMessage(id: string, data: UpdateMessageData): Promise<Message>;
+    updateMessageStatusIfAllowed(data: UpdateMessageStatusData): Promise<any | null>;
 }

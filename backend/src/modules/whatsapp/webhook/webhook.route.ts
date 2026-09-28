@@ -1,10 +1,11 @@
 import express from "express";
-import { verify } from "./webhook.controller.js";
+import { receive, verify } from "./webhook.controller.js";
 
 const router = express.Router();
 
 router
     .route("/")
-    .get(verify);
+    .get(verify)
+    .post(receive);
 
 export default router;

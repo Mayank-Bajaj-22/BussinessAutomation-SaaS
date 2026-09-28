@@ -5,7 +5,8 @@ import { ContactService } from "../contact/contact.service.js";
 import { ConversationService } from "../conversation/conversation.service.js";
 import { MessageService } from "../message/message.service.js";
 import { WEBHOOK_MODES } from "./webhook.constants.js";
-import { WhatsAppWebhookPayload } from "./webhook.types.js";
+import { verifyWhatsAppWebhookSignature } from "./webhook.crypto.js";
+import { WhatsAppWebhookChange, WhatsAppWebhookContact, WhatsAppWebhookMessage, WhatsAppWebhookPayload } from "./webhook.types.js";
 
 export interface VerifyWebhookInput {
     mode?: string;
@@ -14,9 +15,9 @@ export interface VerifyWebhookInput {
 }
 
 export interface ProcessWebhookInput {
-    rawBody?: Buffer;
+    rawBody: Buffer;
     signature?: string;
-    challenge?: string;
+    payload: WhatsAppWebhookPayload;
 }
 
 export class WebhookService {
@@ -86,64 +87,215 @@ export class WebhookService {
         return input.challenge;
     }
 
-    // async processWebhook(
-    //     input: ProcessWebhookInput,
-    // ) {
-    //     const isValidateSignature =
-    //         verifyWhatsAppWebhookSignature(
-    //             input.rawBody,
-    //             input.signature,
-    //         );
+    async processWebhook(
+        input: ProcessWebhookInput,
+    ) {
+        // 1. verify meta signature
 
-    //     if (!isValidateSignature) {
-    //         throw new AppError(
-    //             "Invalid WhatsApp webhook signature",
-    //             401,
-    //         );
-    //     }
+        const isValidateSignature =
+            verifyWhatsAppWebhookSignature(
+                input.rawBody,
+                input.signature,
+            );
 
-    //     if (input.payload.object !== "whatsapp_business_account") {
-    //         throw new AppError(
-    //             "Invalid WhatsApp webhook object",
-    //             400,
-    //         );
-    //     }
+        if (!isValidateSignature) {
+            throw new AppError(
+                "Invalid WhatsApp webhook signature",
+                401,
+            );
+        }
 
-    //     const entries = 
-    //         input.payload.entry ?? [];
+        // 2. validate webhook object
 
-    //     for (const entry of entries) {
-    //         await this.processEntry(entry);
-    //     }
+        if (input.payload.object !== "whatsapp_business_account") {
+            throw new AppError(
+                "Invalid WhatsApp webhook object",
+                400,
+            );
+        }
 
-    //     return {
-    //         processed: true,
-    //     };
-    // }
+        const entries = 
+            input.payload.entry ?? [];
 
-    // private async processEntry(
-    //     entry: NonNullable<
-    //         WhatsAppWebhookPayload["entry"]
-    //     >[number],
-    // ) {
-    //     const changes = 
-    //         entry.changes ?? [];
+        for (const entry of entries) {
+            await this.processEntry(entry);
+        }
 
-    //     for (const change of changes) {
-    //         await this.processChange(change);
-    //     }
-    // }
+        return {
+            processed: true,
+        };
+    }
 
-    // private async processChange(
-    //     change: NonNullable<
-    //         WhatsAppWebhookPayload["entry"]
-    //     >[number]["changes"][number],
-    // ) {
-    //     if (change.field !== "messages") {
-    //         // statuses will be handled separately in step 4.8
-    //         return;
-    //     }
+    private async processEntry(
+        entry: NonNullable<
+            WhatsAppWebhookPayload["entry"]
+        >[number],
+    ) {
+        const changes = 
+            entry.changes ?? [];
 
-    //     const value =
-    // }
+        for (const change of changes) {
+            await this.processChange(change);
+        }
+    }
+
+    private async processChange(
+        change: WhatsAppWebhookChange,
+    ): Promise<void> {
+        if (change.field !== "messages") {
+            // statuses will be handled separately in step 4.8
+            return;
+        }
+
+        const value = change.value;
+
+        if (!value) {
+            return;
+        }
+
+        const phoneNumberId = 
+            value.metadata?.phone_number_id;
+
+        if (!phoneNumberId) {
+            throw new AppError(
+                "WhatsApp phone number ID missing from webhook",
+                400,
+            );
+        }
+
+        const account = 
+            await this.whatsappAccountRepository.findByPhoneNumberId(
+                phoneNumberId,
+            );
+
+        if (!account) {
+            throw new AppError(
+                "WhatsApp account not found for webhook",
+                404,
+            );
+        }
+
+        if (account.status !== "ACTIVE") {
+            return;
+        }
+
+        const messages = value.messages ?? [];
+
+        const contacts = value.contacts ?? [];
+
+        for (const incomingMessage of messages) {
+            await this.processIncomingMessage(
+                account,
+                incomingMessage,
+                contacts,
+            );
+        }
+    }
+
+    private async processIncomingMessage(
+        account: any,
+        incomingMessage: WhatsAppWebhookMessage,
+        contacts: WhatsAppWebhookContact[],
+    ) {
+        const providerMessageId = incomingMessage.id;
+
+        const phoneNumber = incomingMessage.from;
+
+        if (!providerMessageId) {
+            throw new AppError(
+                "Incoming WhatsApp message ID is missing",
+                400,
+            );
+        }
+
+        if (!phoneNumber) {
+            throw new AppError(
+                "Incoming WhatsApp sender phone number is missing",
+                400,
+            );
+        }
+
+        // 1. IDEMPOTENCY CHECK - meta can retry the same webhook
+
+        const exisitngMessage = 
+            await this.messageService.findMessageProviderId(
+                providerMessageId,
+            );
+
+        if (exisitngMessage) {
+            return;
+        }
+
+        // 2. Find sender profile name
+
+        const webhookContact =
+            contacts.find(
+                (contact) =>
+                contact.wa_id === phoneNumber,
+            );
+
+        const contactName =
+            webhookContact?.profile?.name;
+
+        // 3. Get/Create contact
+
+        const contact = 
+            await this.contactService.getOrCreateContact({
+                organizationId: account.organizationId,
+                whatsappAccountId: account.id,
+                phoneNumber,
+                name: contactName,
+            });
+
+        // 4. Get/Create conversation
+
+        const conversation =
+            await this.conversationService.getOrCreateConversation(
+                account.organizationId,
+                account.id,
+                contact.id,
+            );
+
+        // 5. Parse message
+
+        const messageTimestamp = 
+            incomingMessage.timestamp 
+            ? new Date(
+                Number(
+                    incomingMessage.timestamp,
+                ) * 1000,
+            )
+            : new Date();
+
+        let body: string | null = null;
+
+        if (incomingMessage.type === "text") {
+            body = incomingMessage.text?.body ?? null;
+        }
+
+        if (incomingMessage.type !== "text") {
+            return;
+        }
+
+        // 6. Create inbound message
+
+        const message =
+            await this.messageService.createIncomingMessage({
+                conversationId: conversation.id,
+                providerMessageId,
+                body,
+                messageTimestamp,
+            });
+
+        // 7. Update conversation activity
+
+        await this.conversationService.updateLastMessageAt(
+            account.organizationId,
+            account.id,
+            conversation.id,
+            messageTimestamp,
+        );
+
+        return message;
+    }
 }

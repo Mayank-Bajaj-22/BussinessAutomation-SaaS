@@ -1,5 +1,5 @@
 import { Message, PrismaClient } from "@prisma/client";
-import { CreateMessageData, IMessageRepository, UpdateMessageData } from "./message.repository.interface.js";
+import { CreateMessageData, IMessageRepository, UpdateMessageData, UpdateMessageStatusData } from "./message.repository.interface.js";
 
 export class MessageRepository implements IMessageRepository {
     constructor(
@@ -68,5 +68,28 @@ export class MessageRepository implements IMessageRepository {
         });
 
         return message;
+    }
+
+    async updateMessageStatusIfAllowed(
+        data: UpdateMessageStatusData
+    ): Promise<any | null> {
+        const result = 
+            await this.prisma.message.updateMany({
+                where: {
+                    id: data.messageId,
+                    status: {
+                        in: data.allowedPreviousStatuses,
+                    },
+                },
+                data: {
+                    status: data.status,
+                }
+            });
+
+        return this.prisma.message.findUnique({
+            where: {
+                id: data.messageId,
+            },
+        });
     }
 }
