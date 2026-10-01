@@ -1,13 +1,17 @@
+import { WebhookEvent } from "@prisma/client";
 import { AppError } from "../../../common/errors/AppError.js";
 import { env } from "../../../config/env.config.js";
+import { enqueueWebhookEvent } from "../../../jobs/queues/webhook.queue.js";
 import { IWhatsAppAccountRepository } from "../account/whatsapp-account.repository.interface.js";
 import { ContactService } from "../contact/contact.service.js";
 import { ConversationService } from "../conversation/conversation.service.js";
 import { MessageService } from "../message/message.service.js";
+import { createMessageEventKey, createStatusEventKey } from "./webhook-event-key.js";
 import { WebhookEventService } from "./webhook-event.service.js";
-import { WEBHOOK_MODES } from "./webhook.constants.js";
+import { mapMetaStatusToMessageStatus } from "./webhook-status.mapper.js";
+import { WEBHOOK_EVENT_TYPES, WEBHOOK_MODES } from "./webhook.constants.js";
 import { verifyWhatsAppWebhookSignature } from "./webhook.crypto.js";
-import { WhatsAppWebhookChange, WhatsAppWebhookContact, WhatsAppWebhookMessage, WhatsAppWebhookPayload } from "./webhook.types.js";
+import { WhatsAppWebhookChange, WhatsAppWebhookContact, WhatsAppWebhookEntry, WhatsAppWebhookMessage, WhatsAppWebhookPayload, WhatsAppWebhookStatus } from "./webhook.types.js";
 
 export interface VerifyWebhookInput {
     mode?: string;
@@ -120,32 +124,29 @@ export class WebhookService {
             input.payload.entry ?? [];
 
         for (const entry of entries) {
-            await this.processEntry(entry);
+            await this.enqueueEntryEvents(entry);
         }
 
         return {
-            processed: true,
+            received: true,
         };
     }
 
-    private async processEntry(
-        entry: NonNullable<
-            WhatsAppWebhookPayload["entry"]
-        >[number],
-    ) {
-        const changes = 
+    private async enqueueEntryEvents(
+        entry: WhatsAppWebhookEntry,
+    ): Promise<void> {
+        const changes =
             entry.changes ?? [];
 
         for (const change of changes) {
-            await this.processChange(change);
+            await this.enqueueChangeEvents(change);
         }
     }
 
-    private async processChange(
+    private async enqueueChangeEvents(
         change: WhatsAppWebhookChange,
     ): Promise<void> {
         if (change.field !== "messages") {
-            // statuses will be handled separately in step 4.8
             return;
         }
 
@@ -181,17 +182,106 @@ export class WebhookService {
             return;
         }
 
-        const messages = value.messages ?? [];
+        const contacts =
+            value.contacts ?? [];
 
-        const contacts = value.contacts ?? [];
-
-        for (const incomingMessage of messages) {
-            await this.processIncomingMessage(
-                account,
+        for (const incomingMessage of value.messages ?? []) {
+            await this.enqueueIncomingMessage(
+                account.id,
                 incomingMessage,
                 contacts,
             );
         }
+
+        for (const status of value.statuses ?? []) {
+            await this.enqueueMessageStatus(
+                account.id,
+                status,
+            );
+        }
+    }
+
+    private async enqueueIncomingMessage(
+        whatsappAccountId: string,
+        incomingMessage: WhatsAppWebhookMessage,
+        contacts: WhatsAppWebhookContact[],
+    ): Promise<void> {
+        const providerMessageId =
+            incomingMessage.id;
+
+        if (!providerMessageId) {
+            throw new AppError(
+                "Incoming WhatsApp message ID is missing",
+                400,
+            );
+        }
+
+        const eventKey =
+            createMessageEventKey(providerMessageId);
+
+        const payload = { incomingMessage, contacts };
+
+        const { event, isDuplicate } = 
+            await this.webhookEventService.registerEvent({
+                eventKey,
+                eventType: WEBHOOK_EVENT_TYPES.INCOMING_MESSAGE,
+                whatsappAccountId,
+                payload: JSON.parse(
+                    JSON.stringify(payload),
+                ),
+            });
+
+        /*
+            * IMPORTANT:
+            *
+            * Only PROCESSED events are duplicates.
+            * RECEIVED / FAILED events must be retried.
+        */
+
+        if (isDuplicate) {
+            return;
+        }
+
+        await enqueueWebhookEvent(
+            event.id,
+        );
+    }
+
+    private async enqueueMessageStatus(
+        whatsappAccountId: string,
+        status: WhatsAppWebhookStatus,
+    ): Promise<void> {
+        const providerMessageId =
+            status.id;
+
+        const metaStatus =
+            status.status;
+
+        if (!providerMessageId || !metaStatus) {
+            return;
+        }
+
+        const eventKey =
+            createStatusEventKey(providerMessageId, metaStatus);
+
+        const { event, isDuplicate } =
+            await this.webhookEventService.registerEvent({
+                eventKey,
+                eventType:
+                    WEBHOOK_EVENT_TYPES.MESSAGE_STATUS,
+                whatsappAccountId,
+                payload: JSON.parse(
+                    JSON.stringify(status),
+                ),
+            });
+
+        if (isDuplicate) {
+            return;
+        }
+
+        await enqueueWebhookEvent(
+            event.id,
+        );
     }
 
     private async processIncomingMessage(
@@ -199,9 +289,11 @@ export class WebhookService {
         incomingMessage: WhatsAppWebhookMessage,
         contacts: WhatsAppWebhookContact[],
     ) {
-        const providerMessageId = incomingMessage.id;
+        const providerMessageId =
+            incomingMessage.id;
 
-        const phoneNumber = incomingMessage.from;
+        const phoneNumber =
+            incomingMessage.from;
 
         if (!providerMessageId) {
             throw new AppError(
@@ -217,39 +309,42 @@ export class WebhookService {
             );
         }
 
-        // 1. IDEMPOTENCY CHECK - meta can retry the same webhook
-
-        const exisitngMessage = 
+        // Message-level idempotency
+        const existingMessage =
             await this.messageService.findMessageProviderId(
                 providerMessageId,
             );
 
-        if (exisitngMessage) {
-            return;
+        if (existingMessage) {
+            return existingMessage;
         }
 
-        // 2. Find sender profile name
+        // Currently only TEXT is supported
+        if (incomingMessage.type !== "text") {
+            return;
+        }
 
         const webhookContact =
             contacts.find(
                 (contact) =>
-                contact.wa_id === phoneNumber,
+                    contact.wa_id === phoneNumber,
             );
 
         const contactName =
             webhookContact?.profile?.name;
 
-        // 3. Get/Create contact
-
-        const contact = 
+        const contact =
             await this.contactService.getOrCreateContact({
-                organizationId: account.organizationId,
-                whatsappAccountId: account.id,
+                organizationId:
+                    account.organizationId,
+
+                whatsappAccountId:
+                    account.id,
+
                 phoneNumber,
+
                 name: contactName,
             });
-
-        // 4. Get/Create conversation
 
         const conversation =
             await this.conversationService.getOrCreateConversation(
@@ -258,38 +353,29 @@ export class WebhookService {
                 contact.id,
             );
 
-        // 5. Parse message
+        const messageTimestamp =
+            incomingMessage.timestamp
+                ? new Date(
+                    Number(
+                        incomingMessage.timestamp,
+                    ) * 1000,
+                )
+                : new Date();
 
-        const messageTimestamp = 
-            incomingMessage.timestamp 
-            ? new Date(
-                Number(
-                    incomingMessage.timestamp,
-                ) * 1000,
-            )
-            : new Date();
-
-        let body: string | null = null;
-
-        if (incomingMessage.type === "text") {
-            body = incomingMessage.text?.body ?? null;
-        }
-
-        if (incomingMessage.type !== "text") {
-            return;
-        }
-
-        // 6. Create inbound message
+        const body =
+            incomingMessage.text?.body ?? null;
 
         const message =
             await this.messageService.createIncomingMessage({
-                conversationId: conversation.id,
+                conversationId:
+                    conversation.id,
+
                 providerMessageId,
+
                 body,
+
                 messageTimestamp,
             });
-
-        // 7. Update conversation activity
 
         await this.conversationService.updateLastMessageAt(
             account.organizationId,
@@ -299,5 +385,99 @@ export class WebhookService {
         );
 
         return message;
+    }
+
+    async processWebhookEvent(
+        webhookEventId: string,
+    ) : Promise<void> {
+        const event = 
+            await this.webhookEventService.getById(
+                webhookEventId,
+            );
+
+        if (!event) {
+            throw new Error(
+                `Webhook event not found: ${webhookEventId}`,
+            );
+        }
+
+        if (event.status === "PROCESSED") {
+            return;
+        }
+
+        switch (event.eventType) {
+            case WEBHOOK_EVENT_TYPES.INCOMING_MESSAGE:
+                await this.processIncomingMessageEvent(
+                    event,
+                );
+                break;
+
+            case WEBHOOK_EVENT_TYPES.MESSAGE_STATUS:
+                await this.processMessageStatusEvent(
+                    event,
+                );
+                break;
+
+            default:
+                throw new Error(
+                    `Unsupported webhook event type: ${event.eventType}`,
+                );
+        }
+    }
+
+    private async processIncomingMessageEvent(
+        event: WebhookEvent,
+    ): Promise<void> {
+        const payload = event.payload as unknown as {
+            incomingMessage: WhatsAppWebhookMessage;
+            contacts: WhatsAppWebhookContact[];
+        };
+
+        const incomingMessage =
+            payload.incomingMessage;
+
+        const contacts =
+            payload.contacts;
+
+        const account =
+            await this.whatsappAccountRepository.findById(
+                event.whatsappAccountId!,
+            );
+
+        if (!account) {
+            throw new Error(
+                `WhatsApp account not found: ${event.whatsappAccountId}`,
+            );
+        }
+
+        await this.processIncomingMessage(
+            account,
+            incomingMessage,
+            contacts,
+        );
+    }
+
+    private async processMessageStatusEvent(
+        event: WebhookEvent,
+    ): Promise<void> {
+        const status =
+            event.payload as WhatsAppWebhookStatus;
+
+        const providerMessageId =
+            status.id;
+
+        const metaStatus =
+            status.status;
+
+        if (!providerMessageId || !metaStatus) {
+            return;
+        }
+
+        await this.messageService.processStatusUpdate(
+            providerMessageId,
+            mapMetaStatusToMessageStatus(
+                metaStatus,
+            ),
+        );
     }
 }

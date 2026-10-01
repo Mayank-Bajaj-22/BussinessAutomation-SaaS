@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
-import { EmailJob } from "../types/email-job.js";
 import { redisConnection } from "../../config/redis.js";
+import { EmailJob } from "../types/email.queue.types.js";
 
 /**
  * Email Queue

@@ -160,4 +160,24 @@ export class ConversationRepository implements IConversationRepository {
             total,
         };
     }
+
+    async findConversationWithAccount(
+        conversationId: string
+    ): Promise<any | null> {
+        return await prisma.conversation.findUnique({
+            where: {
+                id: conversationId,
+            },
+            select: {
+                id: true,
+                organizationId: true,
+                whatsappAccountId: true,
+                contactId: true,
+                status: true,
+                lastMessageAt: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
+    }
 }

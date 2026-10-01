@@ -7,18 +7,22 @@ import { ConversationService } from "../conversation/conversation.service.js";
 import { MessageRepository } from "../message/message.repository.js";
 import { MessageService } from "../message/message.service.js";
 import { WhatsAppClient } from "../whatsapp.client.js";
+import { WebhookEventRepository } from "./webhook-event.repository.js";
+import { WebhookEventService } from "./webhook-event.service.js";
 import { WebhookService } from "./webhook.service.js";
 
 const contactRepository = new ContactRepository();
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository(prisma);
 const whatsappClient = new WhatsAppClient();
+const webhookEventRepository = new WebhookEventRepository(prisma);
 
 const whatsappAccountRepository = new WhatsAppAccountRepository();
 const contactService = new ContactService(contactRepository, whatsappAccountRepository);
 const conversationService = new ConversationService(conversationRepository, whatsappAccountRepository, contactRepository);
 const messageService = new MessageService(messageRepository, whatsappAccountRepository, contactService, conversationService, whatsappClient);
+const webhookEventService = new WebhookEventService(webhookEventRepository);
 
-const webhookService = new WebhookService(whatsappAccountRepository, contactService, conversationService, messageService);
+const webhookService = new WebhookService(whatsappAccountRepository, contactService, conversationService, messageService, webhookEventService);
 
-export { webhookService };
+export { webhookService, webhookEventService, webhookEventRepository };

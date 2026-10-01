@@ -71,4 +71,66 @@ export class WebhookEventRepository implements IWebhookEventRepository {
             },
         });
     }
+
+    async claimForProcessing(
+        eventId: string
+    ): Promise<boolean> {
+        const result = 
+            await this.prisma.webhookEvent.updateMany({
+                where: {
+                    id: eventId,
+                    status: {
+                        in: ["RECEIVED", "FAILED"],
+                    },
+                },
+                data: {
+                    status: "PROCESSING",
+                    attempts: {
+                        increment: 1,
+                    },
+                    lastError: null,
+                },
+            });
+
+        return result.count === 1;
+    }
+    async markProcessed(
+        eventId: string
+    ): Promise<void> {
+        await this.prisma.webhookEvent.update({
+            where: {
+                id: eventId,
+            },
+            data: {
+                status: "PROCESSED",
+                processedAt: new Date(),
+                lastError: null,
+            },
+        });
+    }
+
+    async findById(
+        id: string
+    ): Promise<any | null> {
+        return this.prisma.webhookEvent.findUnique({
+            where: {
+                id,
+            },
+        });
+    }
+
+    async markFailed(
+        eventId: string, 
+        error: string
+    ): Promise<void> {
+        await this.prisma.webhookEvent.update({
+            where: {
+                id: eventId,
+            },
+            data: {
+                status: "FAILED",
+                lastError: error.slice(0, 2000),
+            },
+        });
+    }
 }

@@ -89,16 +89,27 @@ export class WebhookEventService {
         return this.webhookEventRepository.incrementAttempts(eventId);
     }
 
+    async claimForProcessing(
+        eventId: string,
+    ) : Promise<boolean> {
+        return this.webhookEventRepository.claimForProcessing(
+            eventId,
+        );
+    }
+
     async markProcessed(
         eventId: string,
+    ) : Promise<void> {
+        await this.webhookEventRepository.markProcessed(
+            eventId
+        )
+    }
+
+    async getById(
+        eventId: string,
     ) {
-        return this.webhookEventRepository.updateEvent(
+        return this.webhookEventRepository.findById(
             eventId,
-            {
-                status: WebhookEventStatus.PROCESSED,
-                processedAt: new Date(),
-                lastError: null,
-            },
         );
     }
 
@@ -106,15 +117,14 @@ export class WebhookEventService {
         eventId: string,
         error: unknown,
     ) {
-        const errorMessage =
-            error instanceof Error ? error.message : "Unknown webhook processing error";
+        const errorMessage = 
+            error instanceof Error
+                ? error.message
+                : "Unknown webhook processing error";
 
-        return this.webhookEventRepository.updateEvent(
+        await this.webhookEventRepository.markFailed(
             eventId,
-            {
-                status: WebhookEventStatus.FAILED,
-                lastError: errorMessage,
-            },
+            errorMessage,
         );
     }
 }

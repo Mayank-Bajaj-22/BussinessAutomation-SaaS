@@ -6,6 +6,7 @@ import { ConversationService } from "../conversation/conversation.service.js";
 import { IWhatsAppClient } from "../whatsapp.client.interface.js";
 import { decryptWhatsAppToken } from "../whatsapp.crypto.js";
 import { CreateMessageData, IMessageRepository } from "./message.repository.interface.js";
+import { getAllowedPreviousStatuses } from "./message.status.js";
 
 export interface SendMessageInput {
     organizationId: string;
@@ -225,5 +226,14 @@ export class MessageService {
         if (message.status === status) {
             return message;
         }
+
+        const allowedPreviousStatuses = 
+            getAllowedPreviousStatuses(status);
+
+        return this.messageRepository.updateMessageStatusIfAllowed({
+            messageId: message.id,
+            status,
+            allowedPreviousStatuses,
+        });
     }
 }

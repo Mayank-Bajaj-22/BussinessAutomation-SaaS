@@ -39,20 +39,17 @@ export const verify = CatchAsync(
 
 export const receive = CatchAsync(
     async (req: Request, res: Response) => {
-        if (!req.rawBody) {
-            return res.status(400).json({
-                success: false,
-                message: "Raw webhook body is missing",
+        const signature =
+            req.header(
+                "x-hub-signature-256",
+            );
+
+        const result =
+            await webhookService.processWebhook({
+                rawBody: req.rawBody!,
+                signature,
+                payload: req.body,
             });
-        }
-
-        const signature = req.header("x-hub-signature-256");
-
-        const result = await webhookService.processWebhook({
-            rawBody: req.rawBody,
-            signature,
-            payload: req.body,
-        });
 
         sendResponse(res, 200, {
             success: true,
@@ -60,4 +57,4 @@ export const receive = CatchAsync(
             data: result,
         });
     }
-)
+);

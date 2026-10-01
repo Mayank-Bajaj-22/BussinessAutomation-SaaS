@@ -19,4 +19,8 @@ export interface IWebhookEventRepository {
     findByEventKey(eventKey: string): Promise<any | null>;
     updateEvent(id: string, data: UpdateWebhookEventData): Promise<any>;
     incrementAttempts(id: string): Promise<any>;
+    claimForProcessing(eventId: string): Promise<boolean>;
+    markProcessed(eventId: string): Promise<void>;
+    findById(id: string): Promise<any | null>;
+    markFailed(eventId: string, error: string): Promise<void>;
 }

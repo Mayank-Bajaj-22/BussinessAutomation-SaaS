@@ -135,6 +135,7 @@ enum WebhookEventStatus {
   RECEIVED
   PROCESSED
   FAILED
+  PROCESSING
 }
 
 model User {

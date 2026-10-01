@@ -409,4 +409,12 @@ export class ConversationService {
             },
         );
     }
+
+    async getConversationById(
+        conversationId: string,
+    ) {
+        return this.conversationRepository.findConversationWithAccount(
+            conversationId,
+        );
+    }
 }

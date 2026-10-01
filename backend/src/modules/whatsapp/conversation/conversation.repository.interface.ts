@@ -53,4 +53,8 @@ export interface IConversationRepository {
         conversations: Conversation[];
         total: number;
     }>;
+
+    findConversationWithAccount(
+        conversationId: string,
+    ) : Promise<any | null>;
 }
