@@ -4,6 +4,7 @@ import { env } from "./config/env.config.js";
 import { logger } from "./config/logger.js";
 import "./jobs/index.js";
 import { prisma } from "./lib/prisma.js";
+import { emailWorker, whatsappWebhookWorker } from "./jobs/index.js";
 
 const port = env.PORT;
 
@@ -86,6 +87,28 @@ async function gracefulShutdown(
             },
         );
     };
+
+    // stop bullMQ workers
+
+    try {
+        await Promise.all([
+            emailWorker.close(),
+            whatsappWebhookWorker.close(),
+        ]);
+
+        logger.info("BullMQ workers closed");
+    } catch (error) {
+        logger.error("Failed to close BullMQ workers", {
+            error: 
+                error instanceof Error
+                    ? {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack,
+                    }
+                    : error,
+        });
+    }
 
     // disconnect database
 

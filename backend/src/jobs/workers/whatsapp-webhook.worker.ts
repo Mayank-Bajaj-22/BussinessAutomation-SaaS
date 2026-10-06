@@ -1,17 +1,23 @@
+import { logger } from "../../config/logger.js";
 import { whatsappWebhookWorker } from "./webhook.worker.js";
 
-console.log("WhatsApp Worker Worker started");
+logger.info(
+    "WhatsApp Webhook Worker started",
+);
 
 async function shutdown(
     signal: string,
 ) {
-    console.log(
-        `${signal} received. Shutting down worker...`,
+    logger.info(
+        "WhatsApp Webhook Worker shutting down",
+        {
+            signal,
+        },
     );
 
     await whatsappWebhookWorker.close();
 
-    console.log(
+    logger.info(
         "WhatsApp Webhook Worker stopped",
     );
 

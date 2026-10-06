@@ -75,16 +75,31 @@ export class WebhookEventRepository implements IWebhookEventRepository {
     async claimForProcessing(
         eventId: string
     ): Promise<boolean> {
+        const processingTimeout = new Date(
+            Date.now() - 5 * 60 * 1000,
+        );
+
         const result = 
             await this.prisma.webhookEvent.updateMany({
                 where: {
                     id: eventId,
-                    status: {
-                        in: ["RECEIVED", "FAILED"],
-                    },
+                    OR: [
+                        {
+                            status: {
+                                in: ["RECEIVED", "FAILED"],
+                            },
+                        },
+                        {
+                            status: "PROCESSING",
+                            processingStartedAt: {
+                                lt: processingTimeout,
+                            },
+                        },
+                    ],
                 },
                 data: {
                     status: "PROCESSING",
+                    processingStartedAt: new Date(),
                     attempts: {
                         increment: 1,
                     },
@@ -104,6 +119,7 @@ export class WebhookEventRepository implements IWebhookEventRepository {
             data: {
                 status: "PROCESSED",
                 processedAt: new Date(),
+                processingStartedAt: null,
                 lastError: null,
             },
         });
@@ -129,6 +145,7 @@ export class WebhookEventRepository implements IWebhookEventRepository {
             },
             data: {
                 status: "FAILED",
+                processingStartedAt: null,
                 lastError: error.slice(0, 2000),
             },
         });

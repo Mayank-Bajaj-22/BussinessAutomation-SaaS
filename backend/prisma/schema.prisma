@@ -472,6 +472,7 @@ model WebhookEvent {
   lastError               String?
   receivedAt              DateTime              @default(now())
   processedAt             DateTime?
+  processingStartedAt     DateTime?
   updatedAt               DateTime              @updatedAt
   whatsappAccount         WhatsAppAccount?      @relation(fields: [whatsappAccountId], references: [id], onDelete: SetNull)
 
