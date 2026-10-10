@@ -181,13 +181,13 @@ export class MessageService {
         },
     ) {
         try {
-            return this.messageRepository.createMessage({
+            return await this.messageRepository.createMessage({
                 conversationId: input.conversationId,
                 providerMessageId: input.providerMessageId,
-                direction: "INBOUND",
-                type: "TEXT",
+                direction: MessageDirection.INBOUND,
+                type: MessageType.TEXT,
                 body: input.body,
-                status: "RECEIVED",
+                status: MessageStatus.RECEIVED,
                 messageTimestamp: input.messageTimestamp,
             });
         } catch (error) {
@@ -195,9 +195,16 @@ export class MessageService {
                 error instanceof Prisma.PrismaClientKnownRequestError &&
                 error.code === "P2002"
             ) {
-                return this.messageRepository.findMessageByProviderId(
-                    input.providerMessageId,
-                );
+                const exisitingMessage = 
+                    await this.messageRepository.findMessageByProviderId(
+                        input.providerMessageId,
+                    );
+
+                if (exisitingMessage) {
+                    return exisitingMessage;
+                }
+
+                throw error; 
             }
 
             throw error;

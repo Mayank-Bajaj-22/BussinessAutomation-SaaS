@@ -12,6 +12,7 @@ import { mapMetaStatusToMessageStatus } from "./webhook-status.mapper.js";
 import { WEBHOOK_EVENT_TYPES, WEBHOOK_MODES } from "./webhook.constants.js";
 import { verifyWhatsAppWebhookSignature } from "./webhook.crypto.js";
 import { WhatsAppWebhookChange, WhatsAppWebhookContact, WhatsAppWebhookEntry, WhatsAppWebhookMessage, WhatsAppWebhookPayload, WhatsAppWebhookStatus } from "./webhook.types.js";
+import { IncomingMessageHandler } from "../incoming/incoming-message.handler.js";
 
 export interface VerifyWebhookInput {
     mode?: string;
@@ -32,6 +33,7 @@ export class WebhookService {
         private readonly conversationService: ConversationService,
         private readonly messageService: MessageService,
         private readonly webhookEventService: WebhookEventService,
+        private readonly incomingMessageHandler: IncomingMessageHandler,
     ) {}
 
     verifyWebhook(
@@ -367,13 +369,9 @@ export class WebhookService {
 
         const message =
             await this.messageService.createIncomingMessage({
-                conversationId:
-                    conversation.id,
-
+                conversationId: conversation.id,
                 providerMessageId,
-
                 body,
-
                 messageTimestamp,
             });
 
@@ -383,6 +381,14 @@ export class WebhookService {
             conversation.id,
             messageTimestamp,
         );
+
+        await this.incomingMessageHandler.handle({
+            message,
+            organizationId: account.organizationId,
+            whatsappAccountId: account.id,
+            contactId: contact.id,
+            conversationId: conversation.id,
+        });
 
         return message;
     }

@@ -104,6 +104,7 @@ export class WebhookEventRepository implements IWebhookEventRepository {
                         increment: 1,
                     },
                     lastError: null,
+                    processedAt: null,
                 },
             });
 

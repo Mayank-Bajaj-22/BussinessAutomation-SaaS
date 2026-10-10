@@ -138,6 +138,23 @@ enum WebhookEventStatus {
   PROCESSING
 }
 
+enum ConversationIntent {
+  NONE
+  BOOK_APPOINTMENT
+  CANCEL_APPOINTMENT
+  RESCHEDULE_APPOINTMENT
+  SUPPORT
+}
+
+enum ConversationStep {
+  IDLE
+  WAITING_FOR_SERVICE
+  WAITING_FOR_DATE
+  WAITING_FOR_TIME
+  WAITING_FOR_CONFIRMATION
+  COMPLETED
+}
+
 model User {
   id                  String              @id @default(uuid())
   name                String
@@ -426,6 +443,7 @@ model Conversation {
   contact                 Contact                 @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   messages                Message[]
+  automationState         ConversationState?
 
   @@index([organizationId])
   @@index([whatsappAccountId])
@@ -480,4 +498,22 @@ model WebhookEvent {
   @@index([eventType])
   @@index([receivedAt])
   @@index([whatsappAccountId])
+}
+
+model ConversationState {
+  id                    String                @id @default(uuid())
+  conversationId        String                @unique
+  intent                ConversationIntent    @default(NONE)
+  step                  ConversationStep      @default(IDLE)
+
+  // Temporary data collected during the conversation
+  context               Json?
+
+  // Used for optimistic concurrency control
+  version               Int                   @default(0)
+
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  conversation          Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
