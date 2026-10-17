@@ -1,8 +1,8 @@
 import { Worker } from "bullmq";
 import { logger } from "../../config/logger.js";
 import { emailProcessor } from "../processors/email.processor.js";
-import { EmailJob } from "../types/email-job.js";
 import { redisConnection } from "../../config/redis.js";
+import { EmailJob } from "../types/email.queue.types.js";
 
 /**
  * Email Worker

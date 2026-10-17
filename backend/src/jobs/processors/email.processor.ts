@@ -1,7 +1,7 @@
 import { Job } from "bullmq"
-import { EmailJob } from "../types/email-job.js"
 import { logger } from "../../config/logger.js"
 import { emailService } from "../../services/email/email.service.js";
+import { EmailJob } from "../types/email.queue.types.js";
 
 /**
  * Email Processor

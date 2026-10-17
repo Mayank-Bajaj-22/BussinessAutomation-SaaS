@@ -8,6 +8,7 @@ import organizationWorkingHoursRouter from "../modules/organization-working-hour
 import userRouter from "../modules/user/user.routes.js";
 import whatsappRouter from "../modules/whatsapp/whatsapp.routes.js";
 import webhookRouter from "../modules/whatsapp/webhook/webhook.route.js";
+import serviceRouter from "../modules/service/service.routes.js";
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use("/working-hours", organizationWorkingHoursRouter);
 router.use("/users", userRouter);
 router.use("/whatsapp/webhook", webhookRouter)
 router.use("/whatsapp", whatsappRouter);
+router.use("/organizations/current/services", serviceRouter);
 
 export default router;

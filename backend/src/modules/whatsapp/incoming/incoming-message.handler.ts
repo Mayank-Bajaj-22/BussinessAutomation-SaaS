@@ -1,18 +1,28 @@
 import { logger } from "../../../config/logger.js";
+import { ConversationStateService } from "../conversation-state/conversation-state.service.js";
 import { IncomingMessageContext } from "./incoming-message.types.js";
 
 export class IncomingMessageHandler {
+    constructor(
+        private readonly conversationStateService: ConversationStateService,
+    ) {}
     async handle(
         context: IncomingMessageContext,
     ): Promise<void> {
+        const state = 
+            await this.conversationStateService.getState(
+                context.conversationId,
+            );
+        
         logger.info(
-            "Handling incoming WhatsApp message",
+            "Incoming WhatsApp message received with conversation state",
             {
                 messageId: context.message.id,
                 organizationId: context.organizationId,
-                whatsappAccountId: context.whatsappAccountId,
-                contactId: context.contactId,
                 conversationId: context.conversationId,
+                intent: state.intent,
+                step: state.step,
+                version: state.version,
             },
         );
 
