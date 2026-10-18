@@ -205,6 +205,7 @@ model Organization {
   contacts                    Contact[]
   conversations               Conversation[]
   services                    Service[]
+  staff                       Staff[]
 
   @@index([name])
 }
@@ -533,7 +534,47 @@ model Service {
 
   organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  staffMembers          StaffService[]
+
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("services")
+}
+
+model Staff {
+  id                    String               @id @default(uuid())
+  organizationId        String
+
+  name                  String
+  email                 String?
+  phone                 String?
+  isActive              Boolean             @default(true)
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  services              StaffService[]
+
+  @@unique([organizationId, email])
+  @@unique([organizationId, phone])
+  @@index([organizationId, isActive])
+  @@index([organizationId, name])
+  @@map("staff")
+}
+
+model StaffService {
+  id                  String                @id @default(uuid())
+  staffId             String
+  serviceId           String
+  createdAt           DateTime              @default(now())
+
+  staff               Staff                 @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  service             Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, serviceId])
+  @@index([serviceId])
+  @@map("staff_services")
 }
