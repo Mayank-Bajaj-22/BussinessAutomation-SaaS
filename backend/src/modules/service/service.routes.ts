@@ -1,9 +1,10 @@
 import express from "express";
 import { createService, getById, list, update, updateStatus } from "./service.controller.js";
+import { authMiddleware } from "../../common/middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-router.use();
+router.use(authMiddleware);
 
 router
     .route("/")

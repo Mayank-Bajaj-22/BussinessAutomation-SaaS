@@ -28,7 +28,10 @@ export class ServiceRepository implements IServiceRepository {
         return prisma.service.findFirst({
             where: {
                 organizationId,
-                name,
+                name: {
+                    equals: name.trim(),
+                    mode: "insensitive",
+                },
             },
         });
     }

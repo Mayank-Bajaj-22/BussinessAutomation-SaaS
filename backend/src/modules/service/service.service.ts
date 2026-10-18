@@ -12,10 +12,15 @@ export class ServiceService {
         organizationId: string,
         input: CreateServiceDTO,
     ) {
+        const normalizedInput = {
+            ...input,
+            name: input.name.trim(),
+        };
+
         const existing = 
             await this.serviceRepo.findByName(
                 organizationId,
-                input.name,
+                normalizedInput.name,
             );
 
         if (existing) {
