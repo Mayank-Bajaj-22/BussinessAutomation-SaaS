@@ -155,6 +155,14 @@ enum ConversationStep {
   COMPLETED
 }
 
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
 model User {
   id                  String              @id @default(uuid())
   name                String
@@ -206,6 +214,7 @@ model Organization {
   conversations               Conversation[]
   services                    Service[]
   staff                       Staff[]
+  appointments                Appointment[]
 
   @@index([name])
 }
@@ -417,6 +426,7 @@ model Contact {
   whatsappAccount         WhatsAppAccount             @relation(fields: [whatsappAccountId], references: [id], onDelete: Cascade)
 
   conversations           Conversation[]
+  appointments            Appointment[]
 
   @@unique([whatsappAccountId, phoneNumber])
   @@index([organizationId])
@@ -535,6 +545,7 @@ model Service {
   organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   staffMembers          StaffService[]
+  appointments          Appointment[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -556,6 +567,7 @@ model Staff {
   organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   services              StaffService[]
+  appointments          Appointment[]
 
   @@unique([organizationId, email])
   @@unique([organizationId, phone])
@@ -577,4 +589,42 @@ model StaffService {
   @@unique([staffId, serviceId])
   @@index([serviceId])
   @@map("staff_services")
+}
+
+model Appointment {
+  id                  String                  @id @default(uuid())
+  organizationId      String
+  contactId           String
+  serviceId           String
+  staffId             String
+
+  status              AppointmentStatus       @default(PENDING)
+
+  startAt             DateTime
+  endAt               DateTime
+
+  // Snapshot of what was agreed at booking time.
+  serviceName         String
+  durationMinutes     Int
+  price               Decimal                 @db.Decimal(10, 2)
+
+  customerNote        String?
+  cancellationReason  String?
+
+  idempotencyKey      String?
+
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  organization        Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  contact             Contact                 @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  service             Service                 @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  staff               Staff                   @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, startAt])
+  @@index([organizationId, status, startAt])
+  @@index([staffId, status, startAt])
+  @@index([contactId, startAt])
+  @@map("appointments")
 }
