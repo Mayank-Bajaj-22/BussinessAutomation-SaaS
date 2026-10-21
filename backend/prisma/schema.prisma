@@ -568,6 +568,7 @@ model Staff {
 
   services              StaffService[]
   appointments          Appointment[]
+  workingHours          StaffWorkingHour[]
 
   @@unique([organizationId, email])
   @@unique([organizationId, phone])
@@ -627,4 +628,25 @@ model Appointment {
   @@index([staffId, status, startAt])
   @@index([contactId, startAt])
   @@map("appointments")
+}
+
+model StaffWorkingHour {
+  id                  String                @id @default(uuid())
+  staffId             String
+  dayOfWeek           DayOfWeek
+
+  isWorking           Boolean               @default(true)
+  startTime           String?    
+  endTime             String?
+  breakStart          String?
+  breakEnd            String?
+
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  staff               Staff                 @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, dayOfWeek])
+  @@index([dayOfWeek, isWorking])
+  @@map("staff_working_hours")
 }
